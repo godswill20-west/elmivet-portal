@@ -1,0 +1,356 @@
+/* Fonts: must be the first statement in the file.
+   Swap "Inter" for "Plus Jakarta Sans" here and in --font-sans below if preferred. */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;1,400;1,600&display=swap");
+@import "tailwindcss";
+
+/* ==========================================================================
+   1. DESIGN TOKENS
+   Everything in @theme becomes a utility, e.g.:
+   --color-primary   -> bg-primary, text-primary, border-primary
+   --color-accent    -> bg-accent, text-accent
+   --color-paper     -> bg-paper
+   --color-heading   -> text-heading
+   --color-body      -> text-body
+   --font-serif      -> font-serif
+   ========================================================================== */
+@theme {
+  /* Typography */
+  --font-serif: "Playfair Display", Georgia, "Times New Roman", serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* Brand colors */
+  --color-primary: #0a2540;
+  --color-primary-hover: #071a2e;
+  --color-accent: #d9232d;
+  --color-accent-hover: #b81b23;
+
+  /* Surfaces & borders */
+  --color-paper: #f8fafc;
+  --color-card: #ffffff;
+  --color-border: #e2e8f0;
+  --color-border-strong: #cbd5e1;
+
+  /* Text */
+  --color-heading: #0f172a;
+  --color-body: #334155;
+  --color-muted: #64748b;
+  --color-subtle: #94a3b8;
+
+  /* Display size for cover headlines: text-display */
+  --text-display: clamp(2.5rem, 5vw + 1rem, 5rem);
+  --text-display--line-height: 1.05;
+  --text-display--letter-spacing: -0.03em;
+
+  /* Shadows (override defaults: shadow-sm / shadow-md / shadow-lg) */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -1px rgb(0 0 0 / 0.06);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -2px rgb(0 0 0 / 0.05);
+  --shadow-float: inset 0 1px 0 rgba(255,255,255,0.9), 0 2px 4px rgba(10,37,64,0.04), 0 8px 16px rgba(10,37,64,0.06), 0 24px 48px rgba(10,37,64,0.10), 0 48px 96px -12px rgba(10,37,64,0.20);
+
+  /* Radius (override defaults: rounded-sm / md / lg) */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* Scroll fly-in: enables the animate-fade-in-up utility */
+  --animate-fade-in-up: fade-in-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(2rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  --animate-mouth-opening: mouth-opening 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+  @keyframes mouth-opening {
+    from {
+      opacity: 0;
+      transform: translateY(2.5rem) scaleY(0.92);
+      clip-path: inset(48% 0 48% 0);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+      clip-path: inset(0 0 0 0);
+    }
+  }
+
+}
+
+/* Non-utility tokens (not meant to generate classes) */
+:root {
+  --transition-fast: 0.2s ease;
+  --transition-normal: 0.3s ease;
+  --rule-color: var(--color-border-strong);
+  --stagger: 3rem; /* override per element: style={{ "--stagger": "5rem" }} */
+}
+
+/* ==========================================================================
+   2. BASE STYLES
+   Kept inside @layer base so Tailwind utilities can still override them.
+   The old "* { margin:0; padding:0 }" reset was removed: Tailwind's preflight
+   already does it, and unlayered resets beat every utility (p-4, m-2, etc.).
+   ========================================================================== */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    color: var(--color-body);
+    background-color: var(--color-paper);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-serif);
+    color: var(--color-heading);
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  h1 { font-size: var(--text-4xl); }
+  h2 { font-size: var(--text-3xl); }
+  h3 { font-size: var(--text-2xl); }
+  h4 { font-size: var(--text-xl); }
+
+  p { margin-bottom: 1rem; }
+  p:last-child { margin-bottom: 0; }
+
+  ul, ol { list-style: none; }
+  a { color: inherit; text-decoration: none; }
+
+  ::selection {
+    background-color: var(--color-accent);
+    color: #fff;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+  }
+}
+
+/* ==========================================================================
+   3. LAYOUT HELPERS (replace your old .container / .section-padding)
+   ========================================================================== */
+@utility container {
+  width: 100%;
+  max-width: 75rem; /* 1200px */
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+}
+
+@utility section-padding {
+  padding-block: 3.75rem;
+}
+
+/* ==========================================================================
+   4. EDITORIAL & ASYMMETRICAL LAYOUT UTILITIES
+   Written with @utility (the v4 way), so hover:, md:, lg: etc. variants work.
+   ========================================================================== */
+
+/* --- 4a. Split-screen ratios (stack on mobile, split from md up) ---------- */
+@utility split-60-40 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  @media (width >= 48rem) { grid-template-columns: 3fr 2fr; }
+}
+@utility split-40-60 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  @media (width >= 48rem) { grid-template-columns: 2fr 3fr; }
+}
+@utility split-70-30 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  @media (width >= 48rem) { grid-template-columns: 7fr 3fr; }
+}
+@utility split-30-70 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  @media (width >= 48rem) { grid-template-columns: 3fr 7fr; }
+}
+
+/* 12-column base grid; pair with Tailwind's col-span-* / col-start-* */
+@utility editorial-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.5rem;
+  @media (width >= 48rem) { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+}
+
+/* --- 4b. Staggered / offset items ---------------------------------------- */
+/* Parent: every even child drops down (or rises up) from md up */
+@utility stagger-down {
+  @media (width >= 48rem) {
+    & > :nth-child(even) { margin-top: var(--stagger); }
+  }
+}
+@utility stagger-up {
+  @media (width >= 48rem) {
+    & > :nth-child(even) { margin-top: calc(var(--stagger) * -1); }
+  }
+}
+/* Parent: every third child drops (3-column staggered cascades) */
+@utility stagger-triple {
+  @media (width >= 64rem) {
+    & > :nth-child(3n + 2) { margin-top: var(--stagger); }
+    & > :nth-child(3n + 3) { margin-top: calc(var(--stagger) * 2); }
+  }
+}
+/* Single item: shift without affecting neighbours. shift-y-8, -shift-y-8 */
+@utility shift-y-* {
+  position: relative;
+  top: calc(var(--spacing) * --value(integer));
+}
+@utility -shift-y-* {
+  position: relative;
+  top: calc(var(--spacing) * --value(integer) * -1);
+}
+@utility shift-x-* {
+  position: relative;
+  left: calc(var(--spacing) * --value(integer));
+}
+@utility -shift-x-* {
+  position: relative;
+  left: calc(var(--spacing) * --value(integer) * -1);
+}
+
+/* --- 4c. Overlapping cards ------------------------------------------------ */
+/* Base look for a card that sits on top of another element */
+@utility overlap-card {
+  position: relative;
+  z-index: 10;
+  background-color: var(--color-card);
+  box-shadow: var(--shadow-lg);
+  padding: 1.5rem;
+  @media (width >= 48rem) { padding: 2rem; }
+}
+/* Pull upward / sideways over a neighbour from md up. overlap-t-16, overlap-l-12 */
+@utility overlap-t-* {
+  position: relative;
+  z-index: 10;
+  @media (width >= 48rem) {
+    margin-top: calc(var(--spacing) * --value(integer) * -1);
+  }
+}
+@utility overlap-l-* {
+  position: relative;
+  z-index: 10;
+  @media (width >= 48rem) {
+    margin-left: calc(var(--spacing) * --value(integer) * -1);
+  }
+}
+@utility overlap-r-* {
+  position: relative;
+  z-index: 10;
+  @media (width >= 48rem) {
+    margin-right: calc(var(--spacing) * --value(integer) * -1);
+  }
+}
+
+/* --- 4d. Vertical publication borders / column rules ---------------------- */
+@utility rule-l {
+  border-left: 1px solid var(--rule-color);
+  padding-left: 1.5rem;
+}
+@utility rule-r {
+  border-right: 1px solid var(--rule-color);
+  padding-right: 1.5rem;
+}
+/* Brand-red spine for pull quotes and featured stories */
+@utility rule-accent-l {
+  border-left: 3px solid var(--color-accent);
+  padding-left: 1.25rem;
+}
+/* Classic double rule: thick line + hairline */
+@utility rule-double-l {
+  border-left: 3px double var(--color-primary);
+  padding-left: 1.5rem;
+}
+/* Parent: vertical dividers between sibling columns from md up */
+@utility col-rules {
+  @media (width >= 48rem) {
+    & > * + * {
+      border-left: 1px solid var(--rule-color);
+      padding-left: 1.5rem;
+    }
+    & > :not(:last-child) { padding-right: 1.5rem; }
+  }
+}
+/* Horizontal masthead rule: heavy line over a hairline */
+@utility rule-masthead {
+  border-top: 4px solid var(--color-primary);
+  border-bottom: 1px solid var(--rule-color);
+  padding-block: 0.75rem;
+}
+
+/* --- 4e. Typographic helpers --------------------------------------------- */
+@utility drop-cap {
+  &::first-letter {
+    font-family: var(--font-serif);
+    font-weight: 700;
+    font-size: 4.25rem;
+    line-height: 0.8;
+    float: left;
+    padding: 0.4rem 0.6rem 0 0;
+    color: var(--color-primary);
+  }
+}
+@utility pull-quote {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--text-2xl);
+  line-height: 1.35;
+  color: var(--color-primary);
+  border-left: 3px solid var(--color-accent);
+  padding-left: 1.25rem;
+  margin-block: 1.5rem;
+}
+/* Comfortable reading column (under ~70 characters) */
+@utility measure {
+  max-width: 65ch;
+}
+
+/* ==========================================================================
+   5. COMPONENT RULES (preserved from your original file)
+   !important is kept so these still beat utility classes on the navbar.
+   Longer-term, prefer `hidden md:flex` / `md:hidden` utilities in the JSX.
+   ========================================================================== */
+@layer components {
+  @media (width < 56.25rem) { /* 900px */
+    .desktop-menu,
+    .desktop-cta {
+      display: none !important;
+    }
+
+    button[aria-label="Toggle menu"] {
+      display: flex !important;
+    }
+  }
+}
