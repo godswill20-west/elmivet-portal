@@ -24,7 +24,7 @@ import { buildInsightHref, getLayoutVariant, normalizeInsights } from '../lib/fe
 /* ------------------------------------------------------------------ *
  *  CONTENT
  * ------------------------------------------------------------------ */
-const INSIGHTS_PATH = '/global-insight';
+const INSIGHTS_PATH = '/globalInsight';
 /* Set to e.g. '/global-insight' once article detail pages exist; until then every card
    links to the listing page, exactly as before. Missing/invalid slugs always fall back. */
 const INSIGHT_DETAIL_PATH = null;
