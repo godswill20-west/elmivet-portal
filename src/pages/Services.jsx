@@ -2080,6 +2080,12 @@ function ChinaSection({ onOpen }) {
             <p className="mt-5 max-w-2xl font-sans text-lg leading-relaxed text-[#040350]">
               {CHINA.summary}
             </p>
+              <p className="flex items-center gap-4 mt-4 font-sans font-bold text-sm text-slate-600">
+                NOTICE FOR ONGOING/INCOMING SHIPMENTS:
+              </p>
+              <p className="flex items-center gap-1 italic pt-0 font-sans text-sm text-slate-600">
+                If you have an active, ongoing, or incoming shipment arriving soon and require immediate inquires, processing or clearance, please bypass this form and email your shipment documents directly to quotes@elmivet.com for priority handling.
+              </p>
             <div className="mt-8 border-t border-white/15 pt-5">
               <p className="flex items-center gap-2 font-sans text-sm text-[#D9232D]">
                 <span aria-hidden="true" className="h-4 w-0.5 bg-[#D9232D] shrink-0" />
