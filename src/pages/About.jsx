@@ -430,7 +430,7 @@ export default function About() {
           {/* Premium CTA Button: View Corporate Structure & Governance */}
           <div className="pt-6 flex flex-col items-center justify-center space-y-4">
             <a
-              href="public/documents/organogram.pdf" 
+              href="/documents/organogram.pdf" 
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center space-x-3 bg-[#0A2540] hover:bg-[#D9232D] text-white px-8 py-4 rounded-sm font-sans text-sm font-bold tracking-wide transition-all duration-300 shadow-md group cursor-pointer"
