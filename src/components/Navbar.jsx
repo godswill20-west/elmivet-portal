@@ -60,6 +60,7 @@ const DIVISIONS = [
       'Automobile Dealership & Importation',
       'Real Estate & Project Request',
       'Procurement & Bulk Merchandise',
+      'Real Estate Offshore Investment Enquiry',
     ],
   },
   {
@@ -630,7 +631,6 @@ function Collapse({ open, id, children }) {
 export default function Navbar() {
   const [isVisible, setIsVisible] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [logoFailed, setLogoFailed] = useState(false);
   const [megaOpen, setMegaOpen] = useState(false);
   const [mobileServicesOpen, setMobileServicesOpen] = useState(false);
   const [openDivision, setOpenDivision] = useState(null);
@@ -731,8 +731,8 @@ export default function Navbar() {
       "after:absolute after:inset-x-3 after:-bottom-0.5 after:h-0.5 after:origin-left after:bg-accent after:transition-transform after:duration-300 after:content-['']",
       isActive
         ? `font-bold text-accent after:scale-x-100 hover:bg-slate-100 ${forceHover ? 'bg-slate-100' : ''}`
-        : `font-medium after:scale-x-0 hover:bg-slate-100 hover:text-primary ${
-            forceHover ? 'bg-slate-100 text-primary' : 'text-slate-600'
+          : `font-medium after:scale-x-0 hover:bg-slate-100 hover:text-[#0052E1] ${
+            forceHover ? 'bg-slate-100 text-[#0052E1]' : 'text-slate-600'
           }`,
     ].join(' ');
 
@@ -767,21 +767,14 @@ export default function Navbar() {
           aria-label="Elmivet International, home"
           className="flex items-center gap-3"
         >
-          {!logoFailed ? (
-            <img
-              src="/assets/logo.png"
-              alt=""
-              className="h-9 w-auto object-contain"
-              onError={() => setLogoFailed(true)}
-            />
-          ) : (
-            <span
-              aria-hidden="true"
-              className="flex size-10 items-center justify-center rounded-md bg-primary font-serif text-xl font-bold text-white"
-            >
-              E
-            </span>
-          )}
+          
+          <img
+            src="/logo.svg"
+            alt=""
+            width="36"
+            height="36"
+            className="h-9 w-auto object-contain"
+          />
 
           <span className="flex flex-col">
             <span

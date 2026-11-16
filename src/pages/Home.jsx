@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { Component, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Anchor,
+  ArrowLeft,
   ArrowRight,
   BadgeCheck,
   Building2,
@@ -17,11 +18,16 @@ import {
   ShieldCheck,
   Truck,
 } from 'lucide-react';
+import { imageUrl, useFeaturedInsights } from '../hooks/useElmivetContent';
+import { buildInsightHref, getLayoutVariant, normalizeInsights } from '../lib/featuredInsights';
 
 /* ------------------------------------------------------------------ *
  *  CONTENT
  * ------------------------------------------------------------------ */
 const INSIGHTS_PATH = '/global-insight';
+/* Set to e.g. '/global-insight' once article detail pages exist; until then every card
+   links to the listing page, exactly as before. Missing/invalid slugs always fall back. */
+const INSIGHT_DETAIL_PATH = null;
 const QUOTE_EMAIL = 'quotes@elmivet.com';
 const QUOTE_MAILTO = `mailto:${QUOTE_EMAIL}?subject=${encodeURIComponent(
   'Cargo Quote Request'
@@ -43,12 +49,14 @@ const TECH = [
     name: 'ElmiveTrack',
     tag: 'License-based',
     text: 'Our exclusive, license-based shipment tracking application providing real-time container visibility and cargo security updates.',
+    publicationNote: null
   },
   {
     icon: Cpu,
     name: 'ElmivetHub',
     tag: 'Client portal',
-    text: 'Our integrated enterprise client portal for documentation, digital clearance requests, and port logistics management.',
+    text: 'A unified digital engagement platform connecting clients, partners and stakeholders with events, business opportunities, corporate updates and interactive experiences.',
+    publicationNote: ' scheduled for publication in December 2026.',
   },
 ];
 
@@ -57,6 +65,7 @@ const PILLARS = [
     icon: Anchor,
     title: 'Maritime & On-Dock Operations',
     detail: 'Tin Can Island Port & Eleme Logistics Yard',
+    image: '/images/divisions/ondock.webp',
   },
   {
     icon: Layers,
@@ -93,33 +102,68 @@ const WHY_ITEMS = [
 ];
 
 const SERVE_ITEMS = [
-  'Multinational, Transnational and Domestic Enterprises',
-  'Importers, Exporters and Trade Merchants',
-  'Government Institutions, Public Sector & Statutory Bodies',
-  'Freight Forwarding Partners and Brokers',
-  'Growing and Mid-Market Enterprises',
-  'Corporate Investors and Institutional Occupants',
-  'Oil and Gas Firms',
-  'Manufacturers, Energy and Infrastructure Developers',
-  'Global Traders and Logistics Partners',
+  {
+    title: 'Freight Forwarding Partners and Brokers',
+    image: '/images/audiences/audience-freight-partners.webp',
+  },
+  {
+    title: 'Growing and Mid-Market Enterprises',
+    image: '/images/audiences/audience-mid-market.webp',
+  },
+  {
+    title: 'Corporate Investors and Institutional Occupants',
+    image: '/images/audiences/audience-investors.webp',
+  },
+  {
+    title: 'Oil and Gas Firms',
+    image: '/images/audiences/audience-oil-gas.webp',
+  },
+  {
+    title: 'Manufacturers, Energy and Infrastructure Developers',
+    image: '/images/audiences/audience-manufacturers.webp',
+  },
+  {
+    title: 'Global Traders and Logistics Partners',
+    image: '/images/audiences/audience-global-traders.webp',
+  },
+  {
+    title: 'Multinational, Transnational and Domestic Enterprises',
+    image: '/images/audiences/audience-enterprises.webp',
+  },
+  {
+    title: 'Importers, Exporters and Trade Merchants',
+    image: '/images/audiences/audience-importers.webp',
+  },
+  {
+    title: 'Government Institutions, Public Sector & Statutory Bodies',
+    image: '/images/audiences/audience-government.webp',
+  },
 ];
 
-/* PLACEHOLDER teasers: replace with your real top-3 articles, ideally from a shared
-   src/data/insights.js that the Global Insight page also imports. */
-const INSIGHTS = [
+/* ------------------------------------------------------------------ *
+ *  TEMPORARY: sample dispatches shown ONLY while Sanity has no featured articles
+ *  (or cannot be reached). Set to false when your CMS content is ready, then you can
+ *  delete SAMPLE_INSIGHTS. As soon as at least one published article has isFeatured
+ *  switched on, the live articles are shown and these samples disappear.
+ * ------------------------------------------------------------------ */
+const SHOW_SAMPLES_UNTIL_CMS_READY = true;
+const SAMPLE_INSIGHTS = [
   {
+    _id: 'sample-1',
     category: 'Port Operations',
     title: 'Guangdong Bonded Hub Logistics Expansion',
     excerpt:
       'What expanding bonded-hub capacity in Guangdong means for sourcing, consolidation and onward shipping to West Africa.',
   },
   {
+    _id: 'sample-2',
     category: 'Regulatory Notice',
     title: 'West Africa Port Clearance Regulations 2026',
     excerpt:
       'A practical briefing on clearance and documentation requirements for cargo moving through Nigeria, Benin Republic and Togo ports.',
   },
   {
+    _id: 'sample-3',
     category: 'Market Intelligence',
     title: 'Global Freight Rate Index Updates',
     excerpt:
@@ -236,6 +280,379 @@ function HeroArt() {
 }
 
 /* ------------------------------------------------------------------ *
+ *  WHO WE SERVE IMAGE
+ *  Every photo is cropped to the intended shape (SERVE_ASPECTS) so images of any size
+ *  look consistent and the overlapping caption always sits on the picture. If a file is
+ *  missing or fails to load, the gradient placeholder is shown instead of a broken icon.
+ *  Optional: add `focus: 'object-top'` (or object-left, object-bottom...) to an item in
+ *  SERVE_ITEMS to choose which part of the photo stays visible when it is cropped.
+ * ------------------------------------------------------------------ */
+function ServeImage({ item, index }) {
+  const [failed, setFailed] = useState(false);
+  const aspect = SERVE_ASPECTS[index % SERVE_ASPECTS.length];
+
+  if (!item.image || failed) {
+    return <ImagePlaceholder tone={TONES[index % TONES.length]} className={aspect} label={item.title} />;
+  }
+
+  return (
+    <div className={`relative overflow-hidden bg-primary/10 ${aspect}`}>
+      <img
+        src={item.image}
+        alt={item.title}
+        loading="lazy"
+        decoding="async"
+        onError={() => setFailed(true)}
+        className={`absolute inset-0 h-full w-full object-cover ${item.focus || 'object-center'}`}
+      />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ *  FEATURED INSIGHTS (Sanity-driven)
+ *  Layout by article count: 0 hidden | 1 lead | 2 pair | 3 staggered trio | 4+ carousel
+ * ------------------------------------------------------------------ */
+const CARD_BASE =
+  'flex h-full flex-col border border-border bg-paper transition-all duration-300 hover:-translate-y-1 hover:border-accent/50 hover:bg-white hover:shadow-lg';
+const CAROUSEL_ITEM =
+  'flex shrink-0 snap-start basis-[85%] sm:basis-[calc((100%_-_2rem)/2)] lg:basis-[calc((100%_-_4rem)/3)]';
+
+/* Cover image with the existing gradient placeholder when it is missing or fails to load. */
+function InsightImage({ post, index, aspect, sizes }) {
+  const [failed, setFailed] = useState(false);
+
+  if (!post.coverImage || failed) {
+    return (
+      <ImagePlaceholder tone={TONES[index % TONES.length]} className={aspect} label="Article image" />
+    );
+  }
+
+  const ratio = 0.625; // 16:10, matches the card image crop
+  const src = (w) => imageUrl(post.coverImage, { width: w, height: Math.round(w * ratio) });
+
+  return (
+    <div className={`relative overflow-hidden bg-primary/10 ${aspect}`}>
+      <img
+        src={src(800)}
+        srcSet={`${src(480)} 480w, ${src(800)} 800w, ${src(1200)} 1200w`}
+        sizes={sizes}
+        alt={post.coverAlt}
+        loading="lazy"
+        decoding="async"
+        onError={() => setFailed(true)}
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+    </div>
+  );
+}
+
+function InsightCard({ post, index, lead = false }) {
+  const href = buildInsightHref(post.slug, { listPath: INSIGHTS_PATH, detailBase: INSIGHT_DETAIL_PATH });
+
+  return (
+    <Link to={href} className={`${CARD_BASE} ${lead ? 'lg:flex-row' : ''}`}>
+      <div className={`relative ${lead ? 'lg:w-7/12 lg:shrink-0' : ''}`}>
+        <InsightImage
+          post={post}
+          index={index}
+          aspect={lead ? 'aspect-[16/10] lg:aspect-auto lg:h-full lg:min-h-[22rem]' : 'aspect-[16/10]'}
+          sizes={
+            lead
+              ? '(min-width: 1024px) 58vw, 100vw'
+              : '(min-width: 1024px) 360px, (min-width: 640px) 50vw, 85vw'
+          }
+        />
+        {post.label && (
+          <span className="absolute left-5 top-5 bg-accent px-3 py-1 font-sans text-[0.625rem] font-bold uppercase tracking-widest text-white">
+            {post.label}
+          </span>
+        )}
+      </div>
+
+      <div className={`flex flex-1 flex-col p-6 ${lead ? 'lg:justify-center lg:p-10' : ''}`}>
+        <h3
+          className={`font-serif font-semibold leading-snug text-heading ${
+            lead ? 'text-2xl md:text-3xl lg:text-4xl' : 'text-2xl'
+          }`}
+        >
+          {post.title}
+        </h3>
+        {post.excerpt && (
+          <p className={`mt-3 text-base leading-relaxed text-body ${lead ? '' : 'flex-1'}`}>
+            {post.excerpt}
+          </p>
+        )}
+        {/* keeps the "Read dispatch" row pinned to the card bottom when there is no excerpt */}
+        {!post.excerpt && !lead && <div className="flex-1" />}
+        <span
+          className={`mt-6 inline-flex items-center gap-2 border-t border-border pt-4 font-sans text-sm font-semibold text-primary transition-colors duration-200 group-hover:text-accent ${
+            lead ? 'lg:mt-8 lg:self-start' : ''
+          }`}
+        >
+          Read dispatch
+          <ArrowRight
+            className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1"
+            aria-hidden="true"
+          />
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+/* Scroll-snap carousel for 4+ articles. No autoplay; buttons + native scroll + keyboard. */
+function InsightCarousel({ posts }) {
+  const trackRef = useRef(null);
+  const [edges, setEdges] = useState({ atStart: true, atEnd: false });
+
+  const updateEdges = useCallback(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    setEdges({
+      atStart: el.scrollLeft <= 2,
+      atEnd: el.scrollLeft + el.clientWidth >= el.scrollWidth - 2,
+    });
+  }, []);
+
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    updateEdges();
+    el.addEventListener('scroll', updateEdges, { passive: true });
+    window.addEventListener('resize', updateEdges);
+    return () => {
+      el.removeEventListener('scroll', updateEdges);
+      window.removeEventListener('resize', updateEdges);
+    };
+  }, [updateEdges, posts.length]);
+
+  const scrollByCard = (direction) => {
+    const el = trackRef.current;
+    if (!el) return;
+    const first = el.querySelector('li');
+    const gap = parseFloat(getComputedStyle(el).columnGap) || 32;
+    const step = first ? first.getBoundingClientRect().width + gap : el.clientWidth * 0.8;
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    el.scrollBy({ left: direction * step, behavior: reduce ? 'auto' : 'smooth' });
+  };
+
+  const buttonClass =
+    'inline-flex h-11 w-11 items-center justify-center border border-border bg-white text-primary transition-colors duration-200 hover:border-accent hover:bg-accent hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-border disabled:hover:bg-white disabled:hover:text-primary';
+
+  return (
+    <div role="region" aria-roledescription="carousel" aria-label="Featured dispatches">
+      <div className="mt-14 flex items-center justify-between gap-4">
+        <p className="font-sans text-xs font-bold uppercase tracking-widest text-primary/70">
+          {posts.length} featured dispatches
+        </p>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            className={buttonClass}
+            onClick={() => scrollByCard(-1)}
+            disabled={edges.atStart}
+            aria-label="Previous dispatches"
+          >
+            <ArrowLeft className="h-5 w-5" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className={buttonClass}
+            onClick={() => scrollByCard(1)}
+            disabled={edges.atEnd}
+            aria-label="Next dispatches"
+          >
+            <ArrowRight className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+
+      <ul
+        ref={trackRef}
+        tabIndex={0}
+        aria-label="Featured dispatches, scroll horizontally"
+        className="-mx-1 mt-6 flex snap-x snap-mandatory gap-8 overflow-x-auto px-1 pb-4 pt-2 [scrollbar-width:none] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:scroll-auto [&::-webkit-scrollbar]:hidden"
+      >
+        {posts.map((post, i) => (
+          <li
+            key={post.id}
+            role="group"
+            aria-roledescription="slide"
+            aria-label={`${i + 1} of ${posts.length}`}
+            className={`group ${CAROUSEL_ITEM}`}
+          >
+            <InsightCard post={post} index={i} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function InsightSkeleton() {
+  return (
+    <ul
+      aria-busy="true"
+      aria-label="Loading dispatches"
+      className="mt-14 grid gap-8 md:grid-cols-2 lg:grid-cols-3"
+    >
+      {[0, 1, 2].map((i) => (
+        <li
+          key={i}
+          className={`border border-border bg-paper ${i === 2 ? 'hidden lg:block' : ''} ${
+            i === 1 ? 'hidden md:block' : ''
+          }`}
+        >
+          <div className="aspect-[16/10] animate-pulse bg-border motion-reduce:animate-none" />
+          <div className="space-y-3 p-6">
+            <div className="h-6 w-4/5 animate-pulse bg-border motion-reduce:animate-none" />
+            <div className="h-4 w-full animate-pulse bg-border/70 motion-reduce:animate-none" />
+            <div className="h-4 w-2/3 animate-pulse bg-border/70 motion-reduce:animate-none" />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/* Presentational: takes plain props so every state can be rendered from simulated data. */
+export function FeaturedInsightsView({ insights, loading = false, error = null, onRetry }) {
+  const posts = useMemo(() => normalizeInsights(insights), [insights]);
+  const variant = getLayoutVariant(posts.length);
+  const failed = Boolean(error) && posts.length === 0;
+
+  // Nothing featured (and not loading / failed): remove the whole section, no empty space.
+  if (!loading && !failed && variant === 'none') return null;
+
+  return (
+    <section
+      aria-label="Global Insights and Market Intelligence"
+      className="border-t border-border bg-white py-20 lg:py-20"
+    >
+      <div className="mx-auto max-w-[75rem] px-5">
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+          <Reveal className="max-w-2xl border-l-4 border-accent pl-5">
+            <p className="font-sans text-xs font-bold uppercase tracking-widest text-accent">
+              GLOBAL TRADE INSIGHTS
+            </p>
+            <h2 className="mt-3 font-serif text-4xl font-bold leading-tight text-heading md:text-5xl">
+              Latest Dispatches &amp; Market Intelligence
+            </h2>
+          </Reveal>
+
+          <Link
+            to={INSIGHTS_PATH}
+            className="group inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-md bg-primary px-7 py-3.5 font-sans text-sm font-semibold text-white shadow-md transition-colors duration-200 hover:bg-accent lg:self-auto"
+          >
+            View All Market Insights
+            <ArrowRight
+              className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1"
+              aria-hidden="true"
+            />
+          </Link>
+        </div>
+
+        {loading && posts.length === 0 && <InsightSkeleton />}
+
+        {failed && !loading && (
+          <div
+            role="status"
+            className="mt-14 flex flex-col items-start gap-4 border border-border border-l-4 border-l-accent bg-paper p-6 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <p className="text-base leading-relaxed text-body">
+              Our latest dispatches are temporarily unavailable.
+            </p>
+            {onRetry && (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="inline-flex shrink-0 items-center justify-center rounded-md bg-primary px-5 py-2.5 font-sans text-sm font-semibold text-white transition-colors duration-200 hover:bg-accent"
+              >
+                Try again
+              </button>
+            )}
+          </div>
+        )}
+
+        {variant === 'single' && (
+          <ul className="mt-14">
+            <Reveal as="li" delay={100} className="group">
+              <InsightCard post={posts[0]} index={0} lead />
+            </Reveal>
+          </ul>
+        )}
+
+        {variant === 'pair' && (
+          <ul className="mt-14 grid gap-8 md:grid-cols-2">
+            {posts.map((post, i) => (
+              <Reveal as="li" key={post.id} delay={100 + i * 100} className="group">
+                <InsightCard post={post} index={i} />
+              </Reveal>
+            ))}
+          </ul>
+        )}
+
+        {variant === 'trio' && (
+          <ul className="mt-14 grid gap-8 md:grid-cols-2 lg:grid-cols-3 lg:pb-12">
+            {posts.map((post, i) => (
+              <Reveal
+                as="li"
+                key={post.id}
+                delay={100 + i * 100}
+                className={['group', i === 1 ? 'lg:mt-10' : '', i === 2 ? 'lg:mt-20' : ''].join(' ')}
+              >
+                <InsightCard post={post} index={i} />
+              </Reveal>
+            ))}
+          </ul>
+        )}
+
+        {variant === 'carousel' && (
+          <Reveal delay={100}>
+            <InsightCarousel posts={posts} />
+          </Reveal>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function FeaturedInsights() {
+  const { data, loading, error, refetch } = useFeaturedInsights();
+
+  // Temporary: nothing usable from Sanity (empty or failed) -> show the sample dispatches.
+  const useSamples =
+    SHOW_SAMPLES_UNTIL_CMS_READY && !loading && normalizeInsights(data).length === 0;
+
+  return (
+    <FeaturedInsightsView
+      insights={useSamples ? SAMPLE_INSIGHTS : data}
+      loading={loading}
+      error={useSamples ? null : error}
+      onRetry={refetch}
+    />
+  );
+}
+
+/* A rendering fault in this section hides it instead of taking down the homepage. */
+class FeaturedInsightsBoundary extends Component {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error) {
+    console.error('Featured insights section failed to render:', error);
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
+/* ------------------------------------------------------------------ *
  *  PAGE
  * ------------------------------------------------------------------ */
 export default function Home() {
@@ -247,7 +664,7 @@ export default function Home() {
        *  1. HERO + PROPRIETARY TECHNOLOGY (ElmiveTrack & ElmivetHub)
        * ============================================================ */}
       <section className="relative isolate overflow-hidden bg-primary text-white">
-        {/* Maritime background + navy overlay */}
+        {/* Maritime background image (Unobstructed & Crisp) */}
         <div aria-hidden="true" className="absolute inset-0 -z-10">
           {heroImgFailed ? (
             <div className="h-full w-full opacity-70">
@@ -255,25 +672,23 @@ export default function Home() {
             </div>
           ) : (
             <img
-              src="/assets/hero-port.jpg"
-              alt=""
+              src="/images/hero/home-hero.webp"
+              alt="hero image"
               className="h-full w-full object-cover"
               onError={() => setHeroImgFailed(true)}
             />
           )}
-          <div className="absolute inset-0 bg-linear-to-r from-primary via-primary/90 to-primary/50" />
-          <div className="absolute inset-x-0 bottom-0 h-48 bg-linear-to-t from-primary/80 to-transparent" />
         </div>
 
-        <div className="mx-auto grid max-w-[75rem] items-center gap-14 px-5 py-20 lg:grid-cols-12 lg:gap-10 lg:py-32">
+        <div className="mx-auto grid max-w-[75rem] items-center gap-10 px-5 py-18 lg:grid-cols-12 lg:gap-8 lg:py-23">
           {/* Left: copy */}
           <Reveal className="lg:col-span-7">
-            <p className="inline-flex items-center gap-3 border border-white/30 bg-white/10 px-3.5 py-1.5 font-sans text-xs font-bold uppercase tracking-widest text-white backdrop-blur-sm">
+            <p className="inline-flex items-center gap-3 border border-white/40 bg-primary/80 px-3.5 py-1.5 font-sans text-xs font-bold uppercase tracking-widest text-white shadow-lg backdrop-blur-md">
               <span aria-hidden="true" className="h-px w-8 bg-accent" />
               ELMIVET INTERNATIONAL LIMITED
             </p>
             
-            <h1 className="mt-8 font-serif text-5xl font-bold leading-[1.05] tracking-tight text-white sm:text-6xl lg:text-7xl">
+            <h1 className="mt-5 px-3 font-serif text-4xl font-bold leading-[1.05] tracking-tight text-white drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)] sm:text-5xl lg:text-6xl">
               <span className="block">Connecting Trade.</span>
               <span className="block">Powering Industry.</span>
               <span className="mt-1 block italic">
@@ -281,27 +696,27 @@ export default function Home() {
               </span>
             </h1>
 
-            <p className="mt-8 max-w-xl border-l-2 border-accent pl-5 font-serif text-xl italic text-white/90 md:text-2xl">
+            <p className="mt-5 max-w-xl border-l-4 border-accent bg-primary/40 px-4 py-3 font-serif text-lg italic text-white drop-shadow-[0_3px_10px_rgba(0,0,0,0.95)] backdrop-blur-xs md:text-xl">
               Excellent Solutions. Financial Security.
             </p>
 
-            <div className="mt-10 flex flex-col gap-4 sm:flex-row">
+            <div className="mt-6 flex flex-col gap-3.5 sm:flex-row">
               <Link
                 to="/services"
-                className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-7 py-3.5 font-sans text-sm font-semibold text-primary shadow-md transition-colors duration-200 hover:bg-paper hover:text-accent"
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-6 py-3 font-sans text-sm font-semibold text-primary shadow-xl transition-colors duration-200 hover:bg-paper hover:text-accent"
               >
                 Explore Global Logistics
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
               <Link
                 to="/contact"
-                className="inline-flex items-center justify-center rounded-md bg-accent px-7 py-3.5 font-sans text-sm font-semibold text-white shadow-md transition-colors duration-200 hover:bg-accent-hover"
+                className="inline-flex items-center justify-center rounded-md bg-accent px-6 py-3 font-sans text-sm font-semibold text-white shadow-xl transition-colors duration-200 hover:bg-accent-hover"
               >
                 Request Quote
               </Link>
             </div>
 
-            <p className="mt-8 inline-flex items-center gap-2 font-sans text-xs font-semibold uppercase tracking-widest text-white/70">
+            <p className="bg-primary px-2 py-2 mt-6 inline-flex items-center gap-2 font-sans text-xs font-semibold uppercase tracking-widest text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
               <BadgeCheck className="h-4 w-4 text-white" aria-hidden="true" />
               RC 8809789 · Registered Terminal Operator
             </p>
@@ -310,53 +725,65 @@ export default function Home() {
           {/* Right: proprietary technology, staggered and overlapping */}
           <div className="lg:col-span-5">
             <Reveal delay={200}>
-              <p className="mb-4 border-t-2 border-accent pt-3 font-sans text-xs font-bold uppercase tracking-widest text-white/70">
+              <p className="mb-3 border-t-2 border-accent pt-2.5 font-sans text-xs font-bold uppercase tracking-widest text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
                 Proprietary Technology Ecosystem
               </p>
             </Reveal>
 
-            {TECH.map(({ icon: Icon, name, tag, text }, i) => (
+          {TECH.map(({ icon: Icon, name, tag, text, publicationNote }, i) => (
               <Reveal
                 key={name}
                 delay={300 + i * 150}
                 className={
                   i === 0
-                    ? 'relative border-l-4 border-accent bg-white p-6 text-body shadow-lg'
-                    : 'relative z-10 mt-4 border border-white/25 bg-primary/80 p-6 text-white shadow-lg backdrop-blur-md lg:-mt-3 lg:ml-10'
+                    ? 'relative border-l-4 border-accent bg-white/95 p-5 text-body shadow-2xl backdrop-blur-md'
+                    : 'relative z-10 mt-3 border border-white/30 bg-primary/90 p-5 text-white shadow-2xl backdrop-blur-md lg:-mt-2.5 lg:ml-8'
                 }
               >
-                <div className="flex items-start gap-4">
+                <div className="flex items-start gap-3.5">
                   <span
-                    className={`flex h-12 w-12 shrink-0 items-center justify-center ${
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center ${
                       i === 0 ? 'bg-primary text-white' : 'bg-accent text-white'
                     }`}
                   >
-                    <Icon className="h-6 w-6" strokeWidth={1.75} aria-hidden="true" />
+                    <Icon className="h-5 w-5" strokeWidth={1.75} aria-hidden="true" />
                   </span>
                   <div>
-                    <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2.5">
                       <h2
-                        className={`font-serif text-2xl font-bold ${
-                          i === 0 ? 'text-primary' : 'text-white'
+                        className={`font-serif text-xl font-bold ${
+                          i === 0 ? 'text-primary' : 'text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]'
                         }`}
                       >
                         {name}
                       </h2>
                       <span
                         className={`px-2 py-0.5 font-sans text-[0.625rem] font-bold uppercase tracking-widest ${
-                          i === 0 ? 'bg-accent/10 text-accent' : 'bg-white/15 text-white'
+                          i === 0 ? 'bg-accent/10 text-accent' : 'bg-white/20 text-white'
                         }`}
                       >
                         {tag}
                       </span>
                     </div>
+                    
                     <p
-                      className={`mt-2 text-sm leading-relaxed ${
-                        i === 0 ? 'text-body' : 'text-white/85'
+                      className={`mt-1.5 text-sm leading-relaxed ${
+                        i === 0 ? 'text-slate-800 font-medium' : 'text-white/95 font-medium drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]'
                       }`}
                     >
                       {text}
                     </p>
+
+                    {/* Conditional publication note that only shows if present */}
+                    {publicationNote && (
+                      <p
+                        className={`mt-2 text-xs italic ${
+                          i === 0 ? 'text-slate-600' : 'text-white/80'
+                        }`}
+                      >
+                        {publicationNote}
+                      </p>
+                    )}
                   </div>
                 </div>
               </Reveal>
@@ -436,8 +863,9 @@ export default function Home() {
           </Reveal>
 
           <div className="mt-14 grid gap-6 lg:grid-cols-12">
-            {PILLARS.map(({ icon: Icon, title, detail }, i) => {
+            {PILLARS.map(({ icon: Icon, title, detail, image }, i) => {
               const featured = i === 0;
+              const hasImage = featured && Boolean(image);
               return (
                 <Reveal
                   key={title}
@@ -450,7 +878,28 @@ export default function Home() {
                     i === 2 ? 'lg:relative lg:z-10 lg:-ml-12 lg:shadow-lg' : '',
                   ].join(' ')}
                 >
-                  {featured && (
+                  {/* Background photo + dark navy overlay so the text stays clearly readable */}
+                  {hasImage && (
+                    <>
+                      <img
+                        src={image}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none'; // falls back to the plain navy card
+                        }}
+                        className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-700 group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+                      />
+                      <div
+                        aria-hidden="true"
+                        className="absolute inset-0 bg-gradient-to-t from-primary/95 via-primary/50 to-primary/30"
+                      />
+                    </>
+                  )}
+
+                  {/* Decorative watermark icon: only when there is no photo */}
+                  {featured && !hasImage && (
                     <Icon
                       aria-hidden="true"
                       className="pointer-events-none absolute -bottom-10 -right-10 h-72 w-72 text-white/5"
@@ -472,14 +921,18 @@ export default function Home() {
                         featured
                           ? 'text-3xl text-white md:text-4xl lg:text-5xl'
                           : 'text-2xl text-heading'
-                      }`}
+                      } ${hasImage ? 'drop-shadow-md' : ''}`}
                     >
                       {title}
                     </h3>
 
                     <p
                       className={`mt-5 flex items-start gap-2 border-t pt-5 text-base leading-relaxed ${
-                        featured ? 'border-white/20 text-white/85' : 'border-border text-body'
+                        featured
+                          ? hasImage
+                            ? 'border-white/30 text-white drop-shadow'
+                            : 'border-white/20 text-white/85'
+                          : 'border-border text-body'
                       }`}
                     >
                       <MapPin
@@ -494,7 +947,7 @@ export default function Home() {
                     to="/services"
                     className={`relative mt-8 inline-flex items-center gap-2 font-sans text-sm font-semibold transition-colors duration-200 ${
                       featured ? 'text-white hover:text-white/80' : 'text-primary hover:text-accent'
-                    }`}
+                    } ${hasImage ? 'drop-shadow' : ''}`}
                   >
                     Explore services
                     <ArrowRight
@@ -590,7 +1043,7 @@ export default function Home() {
             {SERVE_ITEMS.map((item, i) => (
               <Reveal
                 as="li"
-                key={item}
+                key={item.title}
                 delay={100 + (i % 3) * 100}
                 className={[
                   'group',
@@ -598,18 +1051,14 @@ export default function Home() {
                   i % 3 === 2 ? 'lg:mt-24' : '',
                 ].join(' ')}
               >
-                {/* Swap ImagePlaceholder for an <img className="h-full w-full object-cover"> later */}
-                <ImagePlaceholder
-                  tone={TONES[i % TONES.length]}
-                  className={`${SERVE_ASPECTS[i % 3]} shadow-md transition-transform duration-500 group-hover:scale-[1.02]`}
-                />
+                <ServeImage item={item} index={i} />
                 <div
                   className={`relative -mt-12 border-t-2 border-accent bg-white p-5 shadow-lg ${
                     SERVE_CAPTION_OFFSETS[i % 3]
                   }`}
                 >
                   <h3 className="font-serif text-lg font-semibold leading-snug text-heading">
-                    {item}
+                    {item.title}
                   </h3>
                 </div>
               </Reveal>
@@ -619,79 +1068,12 @@ export default function Home() {
       </section>
 
       {/* ============================================================ *
-       *  7. GLOBAL INSIGHTS: EDITORIAL PREVIEW
+       *  7. GLOBAL INSIGHTS: LIVE FEATURED DISPATCHES (Sanity)
+       *  Adapts to the number of featured articles; renders nothing if none.
        * ============================================================ */}
-      <section
-        aria-label="Global Insights and Market Intelligence"
-        className="border-t border-border bg-white py-20 lg:py-20"
-      >
-        <div className="mx-auto max-w-[75rem] px-5">
-          <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
-            <Reveal className="max-w-2xl border-l-4 border-accent pl-5">
-              <p className="font-sans text-xs font-bold uppercase tracking-widest text-accent">
-                GLOBAL TRADE INSIGHTS
-              </p>
-              <h2 className="mt-3 font-serif text-4xl font-bold leading-tight text-heading md:text-5xl">
-                Latest Dispatches &amp; Market Intelligence
-              </h2>
-            </Reveal>
-
-            <Link
-              to={INSIGHTS_PATH}
-              className="group inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-md bg-primary px-7 py-3.5 font-sans text-sm font-semibold text-white shadow-md transition-colors duration-200 hover:bg-accent lg:self-auto"
-            >
-              View All Market Insights
-              <ArrowRight
-                className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1"
-                aria-hidden="true"
-              />
-            </Link>
-          </div>
-
-          <ul className="mt-14 grid gap-8 md:grid-cols-2 lg:grid-cols-3 lg:pb-12">
-            {INSIGHTS.map((post, i) => (
-              <Reveal
-                as="li"
-                key={post.title}
-                delay={100 + i * 100}
-                className={['group', i === 1 ? 'lg:mt-10' : '', i === 2 ? 'lg:mt-20' : ''].join(' ')}
-              >
-                <Link
-                  to={INSIGHTS_PATH}
-                  className="flex h-full flex-col border border-border bg-paper transition-all duration-300 hover:-translate-y-1 hover:border-accent/50 hover:bg-white hover:shadow-lg"
-                >
-                  <div className="relative">
-                    <ImagePlaceholder
-                      tone={TONES[i % TONES.length]}
-                      className="aspect-[16/10]"
-                      label="Article image"
-                    />
-                    <span className="absolute left-5 top-5 bg-accent px-3 py-1 font-sans text-[0.625rem] font-bold uppercase tracking-widest text-white">
-                      {post.category}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-1 flex-col p-6">
-                    <h3 className="font-serif text-2xl font-semibold leading-snug text-heading">
-                      {post.title}
-                    </h3>
-                    <p className="mt-3 flex-1 text-base leading-relaxed text-body">
-                      {post.excerpt}
-                    </p>
-                    <span className="mt-6 inline-flex items-center gap-2 border-t border-border pt-4 font-sans text-sm font-semibold text-primary transition-colors duration-200 group-hover:text-accent">
-                      Read dispatch
-                      <ArrowRight
-                        className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1"
-                        aria-hidden="true"
-                      />
-                    </span>
-                  </div>
-                </Link>
-              </Reveal>
-            ))}
-          </ul>
-        </div>
-      </section>
+      <FeaturedInsightsBoundary>
+        <FeaturedInsights />
+      </FeaturedInsightsBoundary>
 
       {/* ============================================================ *
        *  8. DIRECT QUOTE CALL-TO-ACTION STRIP

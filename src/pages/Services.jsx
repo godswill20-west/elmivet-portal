@@ -25,8 +25,6 @@ const HOTLINES = [
   { label: "+234 707 603 5180", tel: "+2347076035180" },
   { label: "+234 812 892 5190", tel: "+2348128925190" },
 ];
-const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&q=80&w=2000";
 
 const MAX_FILES = 5;
 const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
@@ -120,7 +118,7 @@ const NOTES_FIELD = area("notes", "Additional Details", {
 });
 
 /* ==========================================================================
-   Services (19 forms)
+   Services (20 forms)
    Each division / CHINA has an `image` field: set it to a photo path
    (e.g. "/assets/divisions/global-trade.jpg") to replace the placeholder.
    ========================================================================== */
@@ -144,7 +142,7 @@ const DIVISIONS = [
     summary:
       "End-to-end import, export and customs execution across Nigerian ports and the Cotonou and Lomé corridors, with bonded terminal control.",
     Icon: Globe,
-    image: null, // e.g. "/assets/divisions/global-trade.jpg"
+    image: "/images/divisions/division-global-trade.webp", // e.g. "/assets/divisions/global-trade.jpg"
     bg: "bg-slate-50",
     services: [
       {
@@ -250,7 +248,7 @@ const DIVISIONS = [
     summary:
       "Road haulage, warehousing, relocation and bulk distribution built around asset security and on-time delivery.",
     Icon: Truck,
-    image: null, // e.g. "/assets/divisions/logistics.jpg"
+    image: "/images/divisions/division-logistics.webp", // e.g. "/assets/divisions/logistics.jpg"
     bg: "bg-white",
     flip: true,
     services: [
@@ -348,7 +346,7 @@ const DIVISIONS = [
     summary:
       "Vehicles, property and bulk merchandise handled through documented, compliant transactions.",
     Icon: Building2,
-    image: null, // e.g. "/assets/divisions/commercial.jpg"
+    image: "/images/divisions/division-commercial.webp", // e.g. "/assets/divisions/commercial.jpg"
     bg: "bg-slate-50",
     services: [
       {
@@ -416,6 +414,15 @@ const DIVISIONS = [
           file("specFile", "Specification Sheet (optional)"),
         ],
       },
+      {
+        num: 20,
+        title: "Real Estate Offshore Investment Enquiry",
+        desc: "Offshore property acquisition enquiries for registered Elmivet members and new international investors.",
+        icon: Globe,
+        variant: "offshore",
+        cta: "Make an Enquiry",
+        fields: [],
+      },
     ],
   },
   {
@@ -426,7 +433,7 @@ const DIVISIONS = [
     summary:
       "Engineering, energy, petroleum and marine services delivered to compliance-first industrial standards.",
     Icon: Wrench,
-    image: null, // e.g. "/assets/divisions/industrial.jpg"
+    image: "/images/divisions/division-industrial.webp", // e.g. "/assets/divisions/industrial.jpg"
     bg: "bg-white",
     flip: true,
     services: [
@@ -556,7 +563,7 @@ const CHINA = {
   summary:
     "Operating through a strategic alliance with a Guangdong Provincial State-Owned Enterprise, our Zhongshan hub supports sourcing, consolidation, warehousing and export handling for cargo bound for Nigeria and West Africa.",
   Icon: Ship,
-  image: null, // e.g. "/assets/divisions/china-hub.jpg"
+  image: "/images/divisions/division-china-operations.webp", // e.g. "/assets/divisions/china-hub.jpg"
   service: {
     num: 19,
     title: "China Operational & Logistics",
@@ -1034,6 +1041,11 @@ function ModalShell({ onClose, titleId, children }) {
   );
 }
 
+/* After Next advances to the final step, the Submit button can appear under the pointer. For this
+   long (ms) a click on Submit is ignored, so the tail of a quick double-click on Next can never
+   land on Submit and send the form. A deliberate click on Submit comes much later and is unaffected. */
+const SUBMIT_CLICK_GUARD_MS = 600;
+
 function QuoteModal({ service, onClose, onSent }) {
   const formId = `quote-${service.num}`;
   const fields = [...COMMON_FIELDS, ...service.fields, NOTES_FIELD];
@@ -1050,6 +1062,7 @@ function QuoteModal({ service, onClose, onSent }) {
   const lastStep = steps.length - 1;
   const [step, setStep] = useState(0);
   const stepHeadingRef = useRef(null);
+  const submitArmedAt = useRef(0); // time before which a click on Submit is ignored (see guard above)
   const [values, setValues] = useState({});
   const [files, setFiles] = useState([]);
   const [errors, setErrors] = useState({});
@@ -1076,6 +1089,7 @@ function QuoteModal({ service, onClose, onSent }) {
       document.getElementById(`${formId}-${first}`)?.focus();
       return;
     }
+    submitArmedAt.current = Date.now() + SUBMIT_CLICK_GUARD_MS;
     setStep((n) => Math.min(n + 1, lastStep));
   };
 
@@ -1243,6 +1257,7 @@ function QuoteModal({ service, onClose, onSent }) {
             )}
             {step < lastStep ? (
               <button
+                key="quote-next"
                 type="button"
                 onClick={handleNext}
                 className="inline-flex items-center gap-2 bg-[#0A2540] px-6 py-3 font-sans text-sm font-semibold text-white transition-colors hover:bg-[#D9232D]"
@@ -1252,8 +1267,12 @@ function QuoteModal({ service, onClose, onSent }) {
               </button>
             ) : (
               <button
+                key="quote-submit"
                 type="submit"
                 disabled={sending}
+                onClick={(e) => {
+                  if (Date.now() < submitArmedAt.current) e.preventDefault();
+                }}
                 className="inline-flex items-center gap-2 bg-[#0A2540] px-6 py-3 font-sans text-sm font-semibold text-white transition-colors hover:bg-[#D9232D] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {sending ? "Sending..." : "Submit Request"}
@@ -1313,6 +1332,585 @@ function ThanksModal({ service, reference, onClose }) {
           Close
         </button>
       </div>
+    </ModalShell>
+  );
+}
+
+/* ==========================================================================
+   Real Estate Offshore Investment Enquiry (Commercial Division, Form 20)
+   A separate form with its own modal. It reuses ModalShell, Field, validate and the
+   shared styles above, but NOT submitQuote(): that function is a mock which always
+   reports success, and this form collects sensitive investor information.
+   ========================================================================== */
+
+/* OFFSHORE-LOGIC-START (pure logic: no JSX, covered by the logic checks) */
+const OFFSHORE_REGISTERED =
+  "Registered Elmivet Kingdom Member (Offshore Real Estate Investment and Management)";
+const OFFSHORE_NEW = "New International Investor";
+const REGISTERED_ONLY = { field: "investorType", equals: OFFSHORE_REGISTERED };
+const NEW_ONLY = { field: "investorType", equals: OFFSHORE_NEW };
+
+const REGISTERED_MESSAGE =
+  "Thank you for your continued trust. Your assigned Account Liaison Coordinator or Key Account Manager will contact you shortly.";
+const NEW_INVESTOR_MESSAGE =
+  "Thank you. An Elmivet Point of Contact will reach out within official working hours (8:00 AM – 5:00 PM WAT, Monday to Friday) or via remote demand arrangements.";
+
+/* Set this to the real server endpoint that receives the enquiry. While it is empty the
+   form refuses to claim success and shows an error instead. */
+const OFFSHORE_ENQUIRY_ENDPOINT = "";
+
+const ack = (name, label) => ({ name, label, type: "ack", required: true, showIf: NEW_ONLY });
+
+const OFFSHORE_STEPS = [
+  {
+    title: "Client Segmentation",
+    intro: "Tell us how you are connected to Elmivet so we can route your enquiry correctly.",
+    fields: [
+      radio("investorType", "Are you a registered member of Elmivet?", [OFFSHORE_REGISTERED, OFFSHORE_NEW]),
+      text("fullName", "Full Legal Name", {
+        required: true,
+        autoComplete: "name",
+        showIf: REGISTERED_ONLY,
+      }),
+      text("memberId", "Elmivet Member ID / Assigned Point of Contact (POC)", {
+        required: true,
+        showIf: REGISTERED_ONLY,
+      }),
+      area("inquiry", "Direct Inquiry", { required: true, showIf: REGISTERED_ONLY }),
+    ],
+  },
+  {
+    title: "Basic & Corporate Profiling",
+    intro: "Please make sure your details match your passport or international ID.",
+    fields: [
+      text("fullName", "Full Legal Name (must match Passport or International ID)", {
+        required: true,
+        autoComplete: "name",
+        showIf: NEW_ONLY,
+      }),
+      text("citizenship", "Primary Country of Citizenship", { required: true, showIf: NEW_ONLY }),
+      text("residence", "Current Country of Residence", {
+        required: true,
+        autoComplete: "country-name",
+        showIf: NEW_ONLY,
+      }),
+      { name: "email", label: "Email Address", type: "email", required: true, autoComplete: "email", showIf: NEW_ONLY },
+      {
+        name: "phone",
+        label: "Phone Number (with country calling code)",
+        type: "tel",
+        required: true,
+        autoComplete: "tel",
+        hint: "Start with the country calling code, for example +44 7700 900123.",
+        showIf: NEW_ONLY,
+      },
+      checks("channels", "Preferred Contact Channels", ["WhatsApp", "Signal", "Zoom", "Phone Call"], {
+        required: true,
+        showIf: NEW_ONLY,
+      }),
+      radio(
+        "entity",
+        "Purchasing Entity Status",
+        ["Individual / Joint Account", "Offshore Corporation / LLC", "Family Trust / Special Purpose Vehicle (SPV)"],
+        { showIf: NEW_ONLY }
+      ),
+    ],
+  },
+  {
+    title: "Global Asset & Location Targeting",
+    intro: "Choose every region you would consider for an acquisition.",
+    fields: [
+      checks(
+        "regions",
+        "Target Acquisition Region",
+        [
+          "United Kingdom (UK Properties)",
+          "Continental Europe (EU Properties)",
+          "USA",
+          "African/Nigerian Port Corridors (High-yield local assets near trade zones)",
+        ],
+        { required: true, others: true, showIf: NEW_ONLY }
+      ),
+    ],
+  },
+  {
+    title: "Budget & Capital Capabilities",
+    intro: "An estimate is enough at this stage.",
+    fields: [
+      radio("currency", "Currency", ["USD", "EUR", "GBP"], { showIf: NEW_ONLY }),
+      radio(
+        "capitalRange",
+        "Estimated Capital Allocation",
+        ["250,000 – 500,000", "500,000 – 1,000,000", "1,000,000 – 5,000,000", "5,000,000+"],
+        { hint: "Choose the band in the currency selected above.", showIf: NEW_ONLY }
+      ),
+      radio(
+        "fundsSource",
+        "Source of Investment Funds",
+        ["Corporate Profits / Business Income", "Liquidated Investments / Stocks", "Inheritance / Personal Savings"],
+        { showIf: NEW_ONLY }
+      ),
+      radio(
+        "timeline",
+        "Investment Timeline",
+        ["Immediate Purchase (Within 30 days)", "Strategic Window (3–6 months)", "Portfolio Planning / Research Phase"],
+        { showIf: NEW_ONLY }
+      ),
+    ],
+  },
+  {
+    title: "Compliance & Verification",
+    intro: "Please read and accept all three statements to submit your enquiry.",
+    fields: [
+      ack("ackPassport", "I confirm that my provided details match my official government-issued passport."),
+      ack(
+        "ackPrivacy",
+        "I understand that Elmivet International Limited processes all information under strict global privacy laws (GDPR/NDPA compliance)."
+      ),
+      ack(
+        "ackContact",
+        "I acknowledge that an Elmivet Point of Contact will reach out within official working hours (8:00 AM – 5:00 PM WAT, Monday to Friday) or via remote demand arrangements."
+      ),
+    ],
+  },
+];
+
+/* Phone: must begin with + and a country calling code, 7 to 15 digits in total. */
+const PHONE_RE = /^\+[\d\s().-]+$/;
+const PHONE_MESSAGE = "Enter your number with the country calling code, for example +44 7700 900123.";
+
+/* Uses the shared validate() for the generic rules, then adds the extra checks.
+   Hidden fields are skipped because every rule goes through isVisible(). */
+function validateOffshore(fields, values) {
+  const errors = validate(fields.filter((fd) => fd.type !== "ack"), values, []);
+  fields.forEach((fd) => {
+    if (!isVisible(fd, values)) return;
+    if (fd.type === "ack" && !values[fd.name]) {
+      errors[fd.name] = "You must accept this statement to submit.";
+    }
+    if (fd.name === "phone" && !errors.phone && values.phone) {
+      const phone = String(values.phone).trim();
+      const digits = phone.replace(/\D/g, "");
+      if (!PHONE_RE.test(phone) || digits.length < 7 || digits.length > 15 || digits[0] === "0") {
+        errors.phone = PHONE_MESSAGE;
+      }
+    }
+  });
+  return errors;
+}
+
+/* Only fields that are visible for the chosen investor type are sent. */
+function buildOffshorePayload(fields, values, reference) {
+  const registered = values.investorType === OFFSHORE_REGISTERED;
+  const visible = fields.filter((fd) => isVisible(fd, values));
+  const answers = {};
+  visible.forEach((fd) => {
+    if (fd.type === "ack") return;
+    const v = values[fd.name];
+    answers[fd.label] = Array.isArray(v) ? v : String(v ?? "").trim();
+    if (fd.type === "checkbox" && Array.isArray(v) && v.includes("Others")) {
+      answers[`${fd.label} (Others)`] = String(values[`${fd.name}_other`] ?? "").trim();
+    }
+  });
+  const acknowledgements = visible
+    .filter((fd) => fd.type === "ack")
+    .map((fd) => ({ statement: fd.label, accepted: true }));
+  return {
+    form: "real-estate-offshore-investment-enquiry",
+    formNumber: 20,
+    reference,
+    submittedAt: new Date().toISOString(),
+    investorType: registered ? "registered-member" : "new-international-investor",
+    answers,
+    ...(acknowledgements.length ? { acknowledgements } : {}),
+  };
+}
+
+/* Never reports success unless the server confirms it. Never logs the payload. */
+async function submitOffshoreEnquiry(payload) {
+  if (!OFFSHORE_ENQUIRY_ENDPOINT) {
+    console.error("Offshore enquiry NOT sent: OFFSHORE_ENQUIRY_ENDPOINT is not configured.");
+    return { ok: false, reason: "not-configured" };
+  }
+  try {
+    const res = await fetch(OFFSHORE_ENQUIRY_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return res.ok ? { ok: true } : { ok: false, reason: `http-${res.status}` };
+  } catch {
+    return { ok: false, reason: "network" };
+  }
+}
+/* OFFSHORE-LOGIC-END */
+
+const ackClass = choiceClass.replace("items-center", "items-start");
+const WIDE_TYPES = ["radio", "checkbox", "textarea", "file", "ack"];
+
+/* Gentle fade-in used when a field or step appears (no hidden inputs stay mounted). */
+function FadeIn({ children, className = "" }) {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const id = window.requestAnimationFrame(() => setShown(true));
+    return () => window.cancelAnimationFrame(id);
+  }, []);
+  return (
+    <div
+      className={`transition-[opacity,transform] duration-300 ease-out motion-reduce:transition-none ${
+        shown ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
+      } ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+function AckBox({ field, formId, checked, onChange, error }) {
+  const id = `${formId}-${field.name}`;
+  return (
+    <div>
+      <label htmlFor={id} className={ackClass}>
+        <input
+          id={id}
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? `${id}-err` : undefined}
+          className="mt-0.5 h-4 w-4 shrink-0 accent-[#D9232D]"
+        />
+        <span className="leading-relaxed">
+          {field.label}
+          <span className="text-[#D9232D]" aria-hidden="true">
+            {" "}
+            *
+          </span>
+        </span>
+      </label>
+      <FieldError id={`${id}-err`} message={error} />
+    </div>
+  );
+}
+
+function OffshoreInvestmentModal({ service, onClose }) {
+  const formId = `offshore-${service.num}`;
+  const formRef = useRef(null);
+  const headingRef = useRef(null);
+  const submittingRef = useRef(false); // blocks double-clicks before state updates land
+  const submitArmedAt = useRef(0); // time before which a click on Submit is ignored (see SUBMIT_CLICK_GUARD_MS)
+  const [values, setValues] = useState({});
+  const [errors, setErrors] = useState({});
+  const [step, setStep] = useState(0);
+  const [sending, setSending] = useState(false);
+  const [sendFailed, setSendFailed] = useState(false);
+  const [done, setDone] = useState(null); // { reference, registered }
+
+  const isRegistered = values.investorType === OFFSHORE_REGISTERED;
+  // Registered members get a single short step; new investors get all five.
+  const steps = isRegistered ? [OFFSHORE_STEPS[0]] : OFFSHORE_STEPS;
+  const lastStep = steps.length - 1;
+  const current = Math.min(step, lastStep);
+  const fields = steps.flatMap((st) => st.fields);
+
+  const setValue = (name, value) => {
+    setValues((prev) => ({ ...prev, [name]: value }));
+    setSendFailed(false);
+    setErrors((prev) => {
+      if (name === "investorType") return {}; // a different journey: old messages no longer apply
+      if (!prev[name] && !prev[`${name}_other`]) return prev;
+      const { [name]: _a, [`${name}_other`]: _b, ...rest } = prev;
+      return rest;
+    });
+  };
+
+  useEffect(() => {
+    if (current > 0) headingRef.current?.focus();
+  }, [current]);
+
+  useEffect(() => {
+    if (sendFailed) formRef.current?.querySelector("[data-send-error]")?.scrollIntoView({ block: "center" });
+  }, [sendFailed]);
+
+  const focusFirstError = (found) => {
+    const first = Object.keys(found)[0];
+    window.setTimeout(() => {
+      const el = document.getElementById(`${formId}-${first}`);
+      if (el) el.focus();
+      else formRef.current?.querySelector('[role="alert"]')?.scrollIntoView({ block: "center" });
+    }, 0);
+  };
+
+  const handleNext = () => {
+    const found = validateOffshore(steps[current].fields, values);
+    setErrors(found);
+    if (Object.keys(found).length > 0) {
+      focusFirstError(found);
+      return;
+    }
+    submitArmedAt.current = Date.now() + SUBMIT_CLICK_GUARD_MS;
+    setStep((n) => Math.min(n + 1, lastStep));
+  };
+
+  const handlePrevious = () => {
+    setErrors({});
+    setStep((n) => Math.max(n - 1, 0));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (current < lastStep) {
+      handleNext();
+      return;
+    }
+    if (submittingRef.current) return;
+
+    const honeypot = new FormData(e.currentTarget).get("website");
+    const found = validateOffshore(fields, values);
+    setErrors(found);
+    if (Object.keys(found).length > 0) {
+      const badStep = steps.findIndex((st) =>
+        st.fields.some((fd) => found[fd.name] || found[`${fd.name}_other`])
+      );
+      if (badStep !== -1 && badStep !== current) {
+        setStep(badStep);
+        return;
+      }
+      focusFirstError(found);
+      return;
+    }
+
+    const reference = `ELM-${service.num}-${Date.now().toString(36).toUpperCase()}`;
+    if (honeypot) {
+      setDone({ reference, registered: isRegistered }); // bots only: nothing is sent
+      return;
+    }
+
+    submittingRef.current = true;
+    setSending(true);
+    setSendFailed(false);
+    let result = { ok: false };
+    try {
+      result = await submitOffshoreEnquiry(buildOffshorePayload(fields, values, reference));
+    } finally {
+      submittingRef.current = false;
+      setSending(false);
+    }
+    if (result.ok) setDone({ reference, registered: isRegistered });
+    else setSendFailed(true);
+  };
+
+  /* ---------------- Confirmation (only after the server confirmed) ---------------- */
+  if (done) {
+    return (
+      <ModalShell onClose={onClose} titleId={`${formId}-title`}>
+        <div className="px-6 py-10 text-center sm:px-12">
+          <span className="mx-auto flex h-16 w-16 items-center justify-center bg-[#0A2540]">
+            <CheckCircle2 className="h-8 w-8 text-emerald-400" aria-hidden="true" />
+          </span>
+          <span className="mt-6 block font-sans text-xs font-semibold uppercase tracking-widest text-[#D9232D]">
+            Enquiry Received
+          </span>
+          <h2 id={`${formId}-title`} className="mt-2 font-serif text-3xl font-bold text-[#0A2540]">
+            {service.title}
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl font-sans leading-relaxed text-slate-600">
+            {done.registered ? REGISTERED_MESSAGE : NEW_INVESTOR_MESSAGE}
+          </p>
+          <p className="mt-3 font-mono text-xs text-slate-500">Reference: {done.reference}</p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="mt-8 font-sans text-sm font-semibold text-slate-500 underline underline-offset-4 hover:text-[#D9232D]"
+          >
+            Close
+          </button>
+        </div>
+      </ModalShell>
+    );
+  }
+
+  return (
+    <ModalShell onClose={onClose} titleId={`${formId}-title`}>
+      <div className="flex items-start justify-between gap-4 border-b border-slate-200 bg-slate-50 px-6 py-5 sm:px-8">
+        <div>
+          <span className="font-sans text-xs font-semibold uppercase tracking-widest text-[#D9232D]">
+            Investment Enquiry · Form {String(service.num).padStart(2, "0")}
+          </span>
+          <h2 id={`${formId}-title`} className="mt-1 font-serif text-2xl font-bold text-[#0A2540]">
+            {service.title}
+          </h2>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close enquiry form"
+          className="-mr-2 shrink-0 p-2 text-slate-500 hover:text-[#D9232D]"
+        >
+          <X className="h-5 w-5" aria-hidden="true" />
+        </button>
+      </div>
+
+      <form ref={formRef} onSubmit={handleSubmit} noValidate className="px-6 py-6 sm:px-8">
+        {/* Step indicator: hidden for the short registered-member journey */}
+        {!isRegistered && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between gap-4">
+              <span className="font-sans text-xs font-semibold uppercase tracking-widest text-[#D9232D]">
+                Step {current + 1} of {steps.length}
+              </span>
+              <span
+                ref={headingRef}
+                tabIndex={-1}
+                className="text-right font-serif text-lg font-bold text-[#0A2540] outline-none"
+              >
+                {steps[current].title}
+              </span>
+            </div>
+            <div
+              className="mt-3 flex gap-1.5"
+              role="progressbar"
+              aria-valuemin={1}
+              aria-valuemax={steps.length}
+              aria-valuenow={current + 1}
+              aria-label={`Step ${current + 1} of ${steps.length}: ${steps[current].title}`}
+            >
+              {steps.map((st, i) => (
+                <span
+                  key={st.title}
+                  aria-hidden="true"
+                  className={`h-1 flex-1 transition-colors ${i <= current ? "bg-[#D9232D]" : "bg-slate-200"}`}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        <p className="mb-6 font-sans text-sm leading-relaxed text-slate-600">{steps[current].intro}</p>
+
+        <div key={current} className="grid gap-x-5 gap-y-6 sm:grid-cols-2">
+          {steps[current].fields
+            .filter((fd) => isVisible(fd, values))
+            .map((fd) => (
+              <FadeIn key={fd.name} className={fd.wide || WIDE_TYPES.includes(fd.type) ? "sm:col-span-2" : ""}>
+                {fd.type === "ack" ? (
+                  <AckBox
+                    field={fd}
+                    formId={formId}
+                    checked={Boolean(values[fd.name])}
+                    onChange={(checked) => setValue(fd.name, checked)}
+                    error={errors[fd.name]}
+                  />
+                ) : (
+                  <Field
+                    field={fd}
+                    formId={formId}
+                    values={values}
+                    setValue={setValue}
+                    errors={errors}
+                    files={[]}
+                    setFiles={() => {}}
+                  />
+                )}
+                {fd.hint && fd.type !== "textarea" && (
+                  <p className="mt-1.5 font-sans text-xs text-slate-500">{fd.hint}</p>
+                )}
+              </FadeIn>
+            ))}
+
+          {current === 0 && isRegistered && (
+            <FadeIn className="sm:col-span-2">
+              <p
+                role="status"
+                className="border-l-4 border-[#0A2540] bg-slate-50 px-4 py-3 font-sans text-sm leading-relaxed text-slate-700"
+              >
+                {REGISTERED_MESSAGE}
+              </p>
+            </FadeIn>
+          )}
+        </div>
+
+        {/* Honeypot: hidden from people, tempting to bots */}
+        <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" className="hidden" />
+
+        {Object.keys(errors).length > 0 && (
+          <p role="alert" className="mt-6 border-l-4 border-[#D9232D] bg-red-50 px-4 py-3 font-sans text-sm text-[#D9232D]">
+            Please correct the highlighted fields and {current < lastStep ? "continue" : "submit again"}.
+          </p>
+        )}
+
+        {sendFailed && (
+          <div
+            data-send-error
+            role="alert"
+            className="mt-6 border-l-4 border-[#D9232D] bg-red-50 px-4 py-3 font-sans text-sm text-[#D9232D]"
+          >
+            <p>
+              We could not send your enquiry just now. Your answers are still here, so you can try again. If this
+              keeps happening, please call one of our hotlines:
+            </p>
+            <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-semibold">
+              {HOTLINES.map((h) => (
+                <a key={h.tel} href={`tel:${h.tel}`} className="underline underline-offset-2">
+                  {h.label}
+                </a>
+              ))}
+            </p>
+          </div>
+        )}
+
+        <div className="mt-8 flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:items-center sm:justify-between">
+          <p className="flex items-center gap-2 font-sans text-xs text-slate-500">
+            <ShieldCheck className="h-4 w-4 shrink-0 text-[#0A2540]" aria-hidden="true" />
+            Fields marked * are required.
+          </p>
+          <div className="flex gap-3">
+            {current === 0 ? (
+              <button
+                type="button"
+                onClick={onClose}
+                className="border border-slate-300 px-5 py-3 font-sans text-sm font-semibold text-slate-600 transition-colors hover:border-[#0A2540] hover:text-[#0A2540]"
+              >
+                Cancel
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handlePrevious}
+                disabled={sending}
+                className="inline-flex items-center gap-2 border border-slate-300 px-5 py-3 font-sans text-sm font-semibold text-slate-600 transition-colors hover:border-[#0A2540] hover:text-[#0A2540] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                Previous
+              </button>
+            )}
+            {current < lastStep ? (
+              <button
+                key="offshore-next"
+                type="button"
+                onClick={handleNext}
+                className="inline-flex items-center gap-2 bg-[#0A2540] px-6 py-3 font-sans text-sm font-semibold text-white transition-colors hover:bg-[#D9232D]"
+              >
+                Next
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </button>
+            ) : (
+              <button
+                key="offshore-submit"
+                type="submit"
+                disabled={sending}
+                onClick={(e) => {
+                  if (Date.now() < submitArmedAt.current) e.preventDefault();
+                }}
+                className="inline-flex items-center gap-2 bg-[#0A2540] px-6 py-3 font-sans text-sm font-semibold text-white transition-colors hover:bg-[#D9232D] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {sending ? "Sending..." : "Submit Enquiry"}
+                {!sending && <ArrowRight className="h-4 w-4" aria-hidden="true" />}
+              </button>
+            )}
+          </div>
+        </div>
+      </form>
     </ModalShell>
   );
 }
@@ -1386,10 +1984,7 @@ function ServiceCard({ service, DivisionIcon, onOpen, className = "" }) {
   return (
     <Reveal className={`h-full ${className}`}>
       <article className="flex h-full flex-col border border-slate-200 border-t-4 border-t-[#0A2540] bg-white p-6 shadow-sm transition-shadow hover:shadow-lg sm:p-7">
-        <div className="flex items-center justify-between">
-          <span className="font-mono text-xs font-bold text-[#D9232D]">
-            {String(service.num).padStart(2, "0")}
-          </span>
+        <div className="flex items-center justify-end">
           <Icon className="h-5 w-5 text-[#0A2540]" aria-hidden="true" />
         </div>
         <h3 className="mt-4 font-serif text-xl font-bold leading-snug text-[#0A2540]">
@@ -1404,7 +1999,7 @@ function ServiceCard({ service, DivisionIcon, onOpen, className = "" }) {
           aria-haspopup="dialog"
           className="group mt-6 inline-flex w-fit items-center gap-2 bg-[#0A2540] px-5 py-2.5 font-sans text-sm font-semibold text-white transition-colors hover:bg-[#D9232D]"
         >
-          Request a Quote
+          {service.cta || "Request a Quote"}
           <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" aria-hidden="true" />
         </button>
       </article>
@@ -1473,7 +2068,7 @@ function ChinaSection({ onOpen }) {
       aria-labelledby="china-title"
       className="relative scroll-mt-16 overflow-hidden bg-white border-b border-slate-800 py-20 lg:py-28"
     >
-      <div className="container relative z-10">
+      <div id="china-hub" className="scroll-mt-24 container relative z-10">
         <div className="grid items-stretch gap-10 lg:grid-cols-12 lg:gap-12">
           <Reveal className="lg:col-span-7">
             <h2
@@ -1504,9 +2099,6 @@ function ChinaSection({ onOpen }) {
             />
 
             <article className="relative z-10 -mt-10 flex flex-col border-t-4 border-t-[#D9232D] bg-white p-7 shadow-xl sm:p-8 lg:ml-8">
-              <span className="font-mono text-xs font-bold text-[#D9232D]">
-                {String(service.num).padStart(2, "0")}
-              </span>
               <h3 className="mt-3 font-serif text-2xl font-bold text-[#0A2540]">{service.title}</h3>
               <p className="mt-2 flex-1 font-sans text-sm leading-relaxed text-slate-600">
                 {service.desc}
@@ -1562,36 +2154,37 @@ export default function Services() {
       <header className="relative overflow-hidden bg-[#0A2540]">
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-30 mix-blend-overlay"
-          style={{ backgroundImage: `url("${HERO_IMAGE}")` }}
+          className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: `url("/images/hero/services-hero.webp")` }}
         />
+        {/* Lighter gradient overlay to let the crisp hero image shine through */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0A2540] via-[#0A2540]/70 to-transparent"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0A2540]/90 via-[#0A2540]/40 to-transparent"
         />
         <div className="container relative z-10 py-20 lg:py-28">
           <Reveal>
-            <span className="inline-flex items-center gap-2 bg-white px-3 py-1.5 font-sans text-xs font-semibold uppercase tracking-widest text-[#D9232D]">
+            <span className="inline-flex items-center gap-2 bg-white px-3 py-1.5 font-sans text-xs font-semibold uppercase tracking-widest text-[#D9232D] shadow-md">
               <Globe className="h-4 w-4" aria-hidden="true" />
               Services &amp; Global Logistics Hub
             </span>
-            <h1 className="mt-6 max-w-4xl font-serif text-4xl font-bold leading-tight tracking-tight text-white sm:text-5xl lg:text-6xl">
+            <h1 className="mt-6 max-w-4xl font-serif text-4xl font-bold leading-tight tracking-tight text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)] sm:text-5xl lg:text-6xl">
               Enterprise Solutions &amp; Global Logistics Execution.
             </h1>
-            <p className="mt-6 max-w-2xl font-sans text-lg leading-relaxed text-slate-200">
+            <p className="mt-6 max-w-2xl font-sans text-lg font-medium leading-relaxed text-slate-100 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
               Eliminating operational bottlenecks across global trade routes, maritime terminals,
               industrial supply chains, and specialized engineering sectors.
             </p>
-            <dl className="mt-10 flex flex-wrap gap-x-10 gap-y-4 border-t border-white/15 pt-6 font-sans">
+            <dl className="mt-10 flex flex-wrap gap-x-10 gap-y-4 border-t border-white/20 pt-6 font-sans">
               {[
-                ["19", "Services"],
+                ["20", "Services"],
                 ["4", "Core Divisions"],
                 ["1", "China Hub"],
                 ["24h", "Quote Response"],
               ].map(([n, l]) => (
                 <div key={l}>
-                  <dt className="text-xs uppercase tracking-widest text-slate-300">{l}</dt>
-                  <dd className="font-serif text-3xl font-bold text-white">{n}</dd>
+                  <dt className="text-xs uppercase tracking-widest text-slate-200 drop-shadow-sm">{l}</dt>
+                  <dd className="font-serif text-3xl font-bold text-white drop-shadow-md">{n}</dd>
                 </div>
               ))}
             </dl>
@@ -1626,18 +2219,24 @@ export default function Services() {
       </nav>
 
       {/* ---------------- Divisions ---------------- */}
-      {DIVISIONS.map((d) => (
+      <section id="get-quote" className="scroll-mt-24 ...">
+        {DIVISIONS.map((d) => (
         <DivisionSection
           key={d.id}
           division={d}
           onOpen={(service) => setModal({ mode: "form", service })}
-        />
-      ))}
+          />
+        ))}
+      </section>
+      
 
       <ChinaSection onOpen={(service) => setModal({ mode: "form", service })} />
 
       {/* ---------------- Modals ---------------- */}
-      {modal?.mode === "form" && (
+      {modal?.mode === "form" && modal.service.variant === "offshore" && (
+        <OffshoreInvestmentModal key={modal.service.num} service={modal.service} onClose={closeModal} />
+      )}
+      {modal?.mode === "form" && modal.service.variant !== "offshore" && (
         <QuoteModal
           key={modal.service.num}
           service={modal.service}

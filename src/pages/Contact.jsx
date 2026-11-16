@@ -81,7 +81,7 @@ const HUBS = [
   },
   {
     Icon: Ship,
-    title: "China Strategic Warehouse",
+    title: "China Customs Bonded Warehouse and Procurement Hub",
     address:
       "1st Floor, Yongsheng Building, Yongyi 1st Road, Henglan Town, Zhongshan City, Guangdong Province, China.",
   },
@@ -89,7 +89,7 @@ const HUBS = [
 
 const REGIONAL = [
   {
-    title: "Port Harcourt Terminal",
+    title: "Port Harcourt Drop-Off Office",
     address:
       "21 Bekwere Wosu (Formerly Igboukwu Street), D-Line, Port Harcourt, Rivers State.",
   },
@@ -108,9 +108,11 @@ const REGIONAL = [
     address: "15 Margaret Avenue, Beside Enitona Hotel, Old GRA, Aba, Abia State.",
   },
   {
-    title: "Anambra Outlet / Market Hub",
+    title: "Elmivet Electrical Outlet",
     address:
       "Shop 12, Central Line, Zone 3, Electrical Dealers International Market, Obosi, Anambra State.",
+    note: "Sells electrical appliances",
+    note2: "Also serves as a cargo drop-off centre.",
   },
 ];
 
@@ -119,26 +121,31 @@ const EMAIL_BLOCKS = [
     Icon: Mail,
     title: "General Enquiries & Partnerships",
     mailbox: "info@elmivet.com",
+    clause: null
   },
   {
     Icon: FileText,
     title: "Service Quotations",
     mailbox: "quotes@elmivet.com",
-  },
-  {
-    Icon: ShieldAlert,
-    title: "Complaints & Escalations",
-    mailbox: "escalations@elmivet.com",
+    clause: null
   },
   {
     Icon: PackageCheck,
     title: "Logistics & After Sale Support",
     mailbox: "support@elmivet.com",
+    clause: null
+  },
+  {
+    Icon: ShieldAlert,
+    title: "Complaints & Escalations",
+    mailbox: "escalations@elmivet.com",
+    clause: "Unresolved reported issues exceeding 72 hours may be escalated with the ticket support ID issued",
   },
   {
     Icon: Building2,
     title: "Elmivet China Hub",
     mailbox: "china@elmivet.com",
+    clause: null
   },
 ];
 
@@ -216,38 +223,36 @@ export default function Contact() {
       <section
         aria-labelledby="hubs-heading"
         className="relative overflow-hidden bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: `url("${HERO_IMAGE}")` }}
+        style={{ backgroundImage: `url("/images/hero/contact-hero.webp")` }}
       >
-        {/* Dark navy overlay */}
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 bg-[#0A2540]/90 backdrop-blur-xs"
-        />
-
         <div className="container relative z-10 pb-24 pt-16 sm:pt-20 md:pb-32 lg:pt-24">
-          <span className="inline-flex items-center gap-2 bg-white px-3 py-1.5 font-sans text-xs font-semibold uppercase tracking-widest text-[#D9232D]">
+          <span className="inline-flex items-center gap-2 bg-white px-3 py-1.5 font-sans text-xs font-semibold uppercase tracking-widest text-[#D9232D] shadow-md">
             <Globe className="h-4 w-4 text-[#D9232D]" aria-hidden="true" />
             Global Infrastructure &amp; Hubs
           </span>
 
           <h1
             id="hubs-heading"
-            className="mt-6 max-w-4xl font-serif text-4xl font-bold leading-tight tracking-tight text-white sm:text-5xl lg:text-6xl"
+            className="mt-6 max-w-4xl font-serif text-4xl font-bold leading-tight tracking-tight text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.99)] sm:text-5xl lg:text-6xl"
           >
             Strategic Locations Across Nigeria &amp; China.
           </h1>
 
-          <p className="mt-6 font-sans text-sm text-slate-300">
+          <p className="mt-6 font-sans text-sm font-medium text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
             Elmivet International Limited · RC 8809789
           </p>
-          <span aria-hidden="true" className="mt-6 block h-1 w-16 bg-[#D9232D]" />
+          <span
+            aria-hidden="true"
+            className="mt-6 block h-1 w-16 bg-[#D9232D] shadow-md"
+          />
         </div>
       </section>
 
       {/* ---------------- 1b. Hub cards (overlap the hero from md up) ---------------- */}
       <section
+        id="hubs"
         aria-label="Flagship locations"
-        className="flow-root border-b border-slate-200 bg-white pb-16 pt-10 md:pt-0"
+        className="scroll-mt-50 flow-root border-b border-slate-200 bg-white pb-16 pt-10 md:pt-0"
       >
         <div className="container">
           <div className="relative z-10 grid gap-6 md:-mt-16 md:grid-cols-2">
@@ -295,6 +300,15 @@ export default function Contact() {
             <p className="mt-4 font-sans text-sm sm:text-base leading-relaxed text-slate-600">
               Iwoye Street, Odogunyan, Ikorodu, Lagos
             </p>
+
+            {/* Management-approved facility status */}
+            <div className="flex justify-center">
+              <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-accent px-4 py-1 text-center font-sans text-xs sm:text-sm font-semibold tracking-wide text-accent">
+                <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-accent" />
+                <span className="leading-snug">Not Functional Currently Under Construction</span>
+              </span>
+            </div>
+
           </blockquote>
         </Reveal>
 
@@ -304,7 +318,8 @@ export default function Contact() {
       {/* ---------------- 2. Cargo drop-off & regional operations ---------------- */}
       <section
         aria-labelledby="regional-heading"
-        className="w-full bg-slate-100 px-6 py-16"
+        className="scroll-mt-24 w-full bg-slate-100 px-6 py-16"
+        id = "regionalOperations"
       >
         <div className="mx-auto w-full max-w-[75rem]">
           <Reveal>
@@ -324,8 +339,8 @@ export default function Contact() {
           </Reveal>
 
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {REGIONAL.map((loc, i) => (
-              <Reveal key={loc.title} delay={(i % 3) * 90} className="h-full">
+            {REGIONAL.map(({ title, address, note, note2 }, i) => (
+              <Reveal key={title} delay={(i % 3) * 90} className="h-full">
                 <article className="flex h-full gap-4 border border-slate-200 bg-white p-6 shadow-sm">
                   <span
                     aria-hidden="true"
@@ -335,11 +350,30 @@ export default function Contact() {
                   </span>
                   <div>
                     <h3 className="font-serif text-lg font-bold text-[#0A2540]">
-                      {loc.title}
+                      {title}
                     </h3>
                     <p className="mt-2 font-sans text-sm leading-relaxed text-slate-600">
-                      {loc.address}
+                      {address}
                     </p>
+
+                    {/* Wrapper container with tiny or zero spacing between notes */}
+                    {(note || note2) && (
+                      <div className="mt-2 space-y-0.5">
+                        {note && (
+                          <p className="font-sans text-xs italic text-slate-500 flex items-start gap-1.5">
+                            <span className="text-[#D9232D] select-none" aria-hidden="true">•</span>
+                            <span>{note}</span>
+                          </p>
+                        )}
+
+                        {note2 && (
+                          <p className="font-sans text-xs italic text-slate-500 flex items-start gap-1.5">
+                            <span className="text-[#D9232D] select-none" aria-hidden="true">•</span>
+                            <span>{note2}</span>
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </article>
               </Reveal>
@@ -374,7 +408,7 @@ export default function Contact() {
       </section>
 
       {/* ---------------- 3. Direct communication channels ---------------- */}
-      <section aria-labelledby="channels-heading" className="container section-padding">
+      <section id="customer-support" aria-labelledby="channels-heading" className="container section-padding scroll-mt-24">
         <Reveal>
           <div className="mb-12 max-w-3xl">
             <h2
@@ -440,7 +474,7 @@ export default function Contact() {
           </Reveal>
 
           {/* Blocks 2-4: email channels */}
-          {EMAIL_BLOCKS.map(({ Icon, title, mailbox, }, i) => (
+          {EMAIL_BLOCKS.map(({ Icon, title, mailbox, clause }, i) => (
             <Reveal key={title} delay={(i + 1) * 90} className="h-full">
               <article className="flex h-full flex-col border-2 border-[#0A2540] bg-white p-6 sm:p-8">
                 <div className="flex items-center gap-4">
@@ -465,6 +499,14 @@ export default function Contact() {
                       </a>
                     </dd>
                   </div>
+
+                  {/* Only renders if the 'clause' property exists on the item */}
+                  {clause && (
+                    <p className="text-xs text-slate-500 italic mt-2">
+                      {clause}
+                    </p>
+                  )}
+
                 </dl>
               </article>
             </Reveal>

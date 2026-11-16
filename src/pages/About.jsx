@@ -179,7 +179,7 @@ const LEADERS = [
 /* Mission / Vision block: statement + identical 3-card grid */
 function StatementBlock({ data }) {
   return (
-    <div>
+    <div id="Mission" className="scroll-mt-24" >
       <Reveal>
         <div className="mb-8 border-l-[3px] border-[#D9232D] pl-5">
           <h3 className="font-sans text-sm font-semibold uppercase tracking-widest text-[#D9232D]">
@@ -216,63 +216,60 @@ export default function About() {
   return (
     <main className="bg-slate-50 text-slate-700">
       {/* ---------------- 1. Hero / company overview ---------------- */}
-      <header className="relative bg-[#0A2540] text-white overflow-hidden border-b border-slate-800">
-        
-        {/* HERO IMAGE PLACEHOLDER (Background Image Container) */}
-        {/* Replace the Unsplash URL inside style={{ backgroundImage }} with your final image path when ready */}
+      <header className="relative overflow-hidden border-b border-slate-800 bg-[#0A2540] text-white">
+        {/* HERO IMAGE (Unobstructed & Crisp) */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-99 mix-blend-overlay"
+          className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{
-            backgroundImage:
-              'url("https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&q=80&w=2000")',
+            backgroundImage: 'url("/images/hero/about-hero.webp")',
           }}
-        />
-
-        {/* ULTRA-TRANSPARENT GRADIENT TINT (Keeps the background image crystal clear while preserving text contrast) */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#0A2540]/80 via-[#0A2540]/40 to-[#0A2540]/60"
         />
 
         {/* CONTENT CONTAINER (Preserving exact split-60-40 layout grid) */}
         <div className="container section-padding relative z-10">
           <div className="split-60-40 items-center gap-10 lg:gap-16">
-            
             {/* Left: Headline & Reg Details (Unboxed, sitting directly over the clear hero background) */}
             <div className="space-y-6">
               <Reveal>
-                <span className="inline-block rounded-sm border border-[#D9232D]/40 bg-[#D9232D]/20 px-3 py-1 font-sans text-xs font-bold uppercase tracking-widest text-red-400 backdrop-blur-md">
+                <span className="inline-block rounded-sm border border-[#D9232D]/60 bg-white px-3 py-1 font-sans text-xs font-bold uppercase tracking-widest text-accent shadow-lg backdrop-blur-md">
                   Corporate Profile &amp; Heritage
                 </span>
               </Reveal>
 
               <Reveal delay={100}>
-                <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight tracking-tight text-white drop-shadow-md">
+                <h1 className="font-serif text-4xl font-extrabold leading-tight tracking-tight text-white drop-shadow-[0_3px_12px_rgba(0,0,0,0.95)] sm:text-5xl lg:text-6xl">
                   Shaping Africa’s Commercial &amp; Logistical Future.
                 </h1>
               </Reveal>
 
               <Reveal delay={200}>
-                <p className="font-mono text-xs text-slate-300 flex items-center space-x-2">
-                  <span>Elmivet International Limited</span>
-                  <span className="text-[#D9232D] font-bold">· RC 8809789</span>
+                <p className="flex items-center space-x-2 font-mono text-xs font-semibold text-accent drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
+                  <span className="bg-white px-4 py-1"> Elmivet International Limited</span>
+                  <span className=" bg-white px-2 py-1 font-bold text-[#D9232D] drop-shadow-[0_1px_4px_rgba(0,0,0,0.95)]">
+                    · RC 8809789
+                  </span>
                 </p>
               </Reveal>
             </div>
 
             {/* Right: Company Overview Card (Curved Edges & Original Width) */}
             <Reveal delay={300} className="h-full">
-              <div className="bg-white/95 backdrop-blur-md text-slate-900 p-8 lg:p-10 rounded-2xl shadow-2xl border-t-4 border-[#D9232D] space-y-4">
-                <h2 className="font-serif text-2xl lg:text-3xl font-bold text-[#0A2540]">
+              <div className="space-y-4 rounded-2xl border-t-4 border-[#D9232D] bg-white/95 p-8 text-slate-900 shadow-2xl backdrop-blur-md lg:p-10">
+                <h2 className="font-serif text-2xl font-bold text-[#0A2540] lg:text-3xl">
                   Company Overview
                 </h2>
-                <p className="font-sans text-base lg:text-lg leading-relaxed text-slate-700">
-                  Founded on the principles of operational reliability and strict compliance, Elmivet International Limited has grown into one of Africa’s premier multi-sector conglomerates. We operate at the intersection of global commerce and local execution, providing enterprise-grade business solutions that eliminate operational bottlenecks and safeguard high-value corporate investments.
+                <p className="font-sans text-base leading-relaxed text-slate-700 lg:text-lg">
+                  Founded on the principles of operational reliability and strict
+                  compliance, Elmivet International Limited has grown into one
+                  of Africa’s premier multi-sector conglomerates. We operate at
+                  the intersection of global commerce and local execution,
+                  providing enterprise-grade business solutions that eliminate
+                  operational bottlenecks and safeguard high-value corporate
+                  investments.
                 </p>
               </div>
             </Reveal>
-
           </div>
         </div>
       </header>
@@ -360,7 +357,7 @@ export default function About() {
 
       {/* ---------------- 5. Leadership & structure ---------------- */}
             {/* Meet Our Leadership Section */}
-      <section className="bg-slate-100 py-20 px-6 lg:px-12 border-t border-slate-200">
+      <section id="leadership" className="scroll-mt-24 bg-slate-100 py-20 px-6 lg:px-12 border-t border-slate-200">
         <div className="max-w-5xl mx-auto space-y-12">
           
           <div className="text-center space-y-3 max-w-2xl mx-auto">

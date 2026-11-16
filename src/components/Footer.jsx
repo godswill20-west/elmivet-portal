@@ -1,15 +1,10 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
+import BackToTop from './BackToTop';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
   const [isTikTokDropdownOpen, setIsTikTokDropdownOpen] = useState(false);
-  const scrollToTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth'
-    });
-  };
 
   return (
     <footer className="bg-[#0A2540] text-slate-200 font-sans border-t-4 border-[#D9232D]">
@@ -20,14 +15,14 @@ export default function Footer() {
           {/* Brand & Editorial Mission */}
           <div className="lg:col-span-5 space-y-6">
             <div className="flex items-center space-x-3">
-              <div className="bg-[#D9232D] text-white font-serif text-2xl font-bold w-12 h-12 rounded-lg flex items-center justify-center shadow-md">
-                E
+              <div className="bg-white w-12 h-12 shrink-0 rounded-lg flex items-center justify-center p-1.5 shadow-md">
+                <img src="/logo.svg" alt="" className="h-full w-full object-contain" />
               </div>
               <div>
                 <span className="font-serif text-3xl font-extrabold tracking-tight text-white block leading-none">
                   ELMIVET
                 </span>
-                <span className="text-[11px] font-bold tracking-[0.2em] text-slate-400 uppercase mt-1.5 block">
+                <span className="text-[11px] font-bold tracking-[0.2em] text-accent uppercase mt-1.5 block">
                   INTERNATIONAL LIMITED
                 </span>
               </div>
@@ -111,7 +106,7 @@ export default function Footer() {
       </div>
 
       {/* Middle Section: Navigation & Main Social Channels */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 border-b border-slate-800">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-10 gap-y-2 border-b border-slate-800">
         
         {/* Quick Link Hub */}
         <div className="space-y-4">
@@ -119,11 +114,10 @@ export default function Footer() {
             Quick Links
           </h3>
           <ul className="space-y-2.5 text-sm text-slate-300">
-            <li><NavLink to="/" className="hover:text-[#D9232D] transition-colors">Customer Support</NavLink></li>
-            <li><NavLink to="/contact" className="hover:text-[#D9232D] transition-colors">Get a Quote</NavLink></li>
+            <li><NavLink to="/services#get-quote" className="hover:text-[#D9232D] transition-colors">Get a Quote</NavLink></li>
+            <li><NavLink to="/contact#customer-support" className="hover:text-[#D9232D] transition-colors">Customer Support</NavLink></li>
             <li><NavLink to="/services" className="hover:text-[#D9232D] transition-colors">Services & Global Freight</NavLink></li>
-            <li><NavLink to="/tracking" className="hover:text-[#D9232D] transition-colors">Tracking & Forms Portal</NavLink></li>
-            <li><NavLink to="/china-hub" className="hover:text-[#D9232D] transition-colors">China Office & Bonded Hub</NavLink></li>
+            <li><NavLink to="/Contact#hubs" className="hover:text-[#D9232D] transition-colors">China Office & Bonded Hubs</NavLink></li>
           </ul>
         </div>
 
@@ -132,15 +126,12 @@ export default function Footer() {
           <h3 className="font-serif text-lg font-bold text-white tracking-wide border-l-2 border-[#D9232D] pl-3">
             Our Divisions
           </h3>
-          <div className="space-y-3 text-xs text-slate-300">
-            <ul className="space-y-2.5 text-sm text-slate-300">
-              <li><NavLink to="/" className="hover:text-[#D9232D] transition-colors">Global Trade</NavLink></li>
-              <li><NavLink to="/china-hub" className="hover:text-[#D9232D] transition-colors">Logistics & Supply Chain</NavLink></li>
-              <li><NavLink to="/services" className="hover:text-[#D9232D] transition-colors">Commercial</NavLink></li>
-              <li><NavLink to="/tracking" className="hover:text-[#D9232D] transition-colors">Industrial</NavLink></li>
-              <li><NavLink to="/contact" className="hover:text-[#D9232D] transition-colors">China Operations</NavLink></li>
-            </ul>
-          </div>
+          <ul className="space-y-2.5 text-sm text-slate-300">
+            <li><NavLink to="/Services#logistics-supply-chain" className="hover:text-[#D9232D] transition-colors">Logistics & Supply Chain</NavLink></li>
+            <li><NavLink to="/services#commercial" className="hover:text-[#D9232D] transition-colors">Commercial</NavLink></li>
+            <li><NavLink to="/Services#industrial" className="hover:text-[#D9232D] transition-colors">Industrial</NavLink></li>
+            <li><NavLink to="/Services#china-hub" className="hover:text-[#D9232D] transition-colors">China Operations</NavLink></li>
+          </ul>
         </div>
 
         {/* Company Information Hub */}
@@ -148,17 +139,15 @@ export default function Footer() {
           <h3 className="font-serif text-lg font-bold text-white tracking-wide border-l-2 border-[#D9232D] pl-3">
             Company Information
           </h3>
-          <div className="space-y-3 text-xs text-slate-300">
-            <ul className="space-y-2.5 text-sm text-slate-300">
-              <li><NavLink to="/" className="hover:text-[#D9232D] transition-colors">About Elmivet</NavLink></li>
-              <li><NavLink to="/china-hub" className="hover:text-[#D9232D] transition-colors">Leadership</NavLink></li>
-              <li><NavLink to="/services" className="hover:text-[#D9232D] transition-colors">Delivered Jobs</NavLink></li>
-              <li><NavLink to="/tracking" className="hover:text-[#D9232D] transition-colors">Brand Parternships</NavLink></li>
-            </ul>
-          </div>
+          <ul className="space-y-2.5 text-sm text-slate-300">
+            <li><NavLink to="/About" className="hover:text-[#D9232D] transition-colors">About Elmivet</NavLink></li>
+            <li><NavLink to="/About#leadership" className="hover:text-[#D9232D] transition-colors">Leadership</NavLink></li>
+            <li><NavLink to="/About#Mission" className="hover:text-[#D9232D] transition-colors">Our Mission & Vision</NavLink></li>
+            <li><NavLink to="/Contact#regionalOperations" className="hover:text-[#D9232D] transition-colors">Cargo Drop-Off</NavLink></li>
+          </ul>
         </div>
 
-                {/* Operational Hubs Summary */}
+        {/* Operational Hubs Summary */}
         <div className="space-y-4">
           <h3 className="font-serif text-lg font-bold text-white tracking-wide border-l-2 border-[#D9232D] pl-3">
             Global Footprint
@@ -179,10 +168,18 @@ export default function Footer() {
           </div>
         </div>
 
+        {/* Spanning Callout Line (Starts at Column 3 & crosses Column 4) */}
+        <div className="md:col-span-2 lg:col-start-3 lg:col-span-2 pt-4 border-t border-slate-800/80">
+          <p className="text-xs sm:text-sm text-slate-400 italic tracking-wide flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#D9232D] shrink-0" aria-hidden="true" />
+            Follow our social media for a few of our delivered jobs.
+          </p>
+        </div>
+
       </div>
 
       {/* Social Media & Split-Grid TikTok Popover Bar */}
-      <div className="py-8">
+      <div className="py-2">
         <div className="max-w-7xl mx-auto px-6 lg:px-12 flex flex-col lg:flex-row items-center justify-between gap-6">
           
           <div className="text-center lg:text-left">
@@ -286,7 +283,7 @@ export default function Footer() {
                 >
                   {/* Category 1: Corporate Operations */}
                   <div>
-                    <span className="text-[10px] font-bold text-[#D9232D] uppercase tracking-wider block border-b border-slate-800 pb-1 mb-2">
+                    <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block border-b border-slate-800 pb-1 mb-2">
                       Corporate Operations (Business & Logistics)
                     </span>
                     <div className="space-y-1.5 font-mono">
@@ -296,7 +293,7 @@ export default function Footer() {
                         rel="noreferrer"
                         className="block px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-200 hover:text-white transition-colors"
                       >
-                        • Main Brand: <span className="text-[#D9232D]">@elmivet_int_ltd</span>
+                        • Main Brand: <span className="text-amber-400">@elmivet_int_ltd</span>
                       </a>
                       <a 
                         href="https://www.tiktok.com/@elmivet_impex?_r=1&_t=ZS-9AEqlszZjVQ" 
@@ -304,7 +301,7 @@ export default function Footer() {
                         rel="noreferrer"
                         className="block px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-200 hover:text-white transition-colors"
                       >
-                        • Import/Export: <span className="text-[#D9232D]">@elmivet_impex</span>
+                        • Import/Export: <span className="text-amber-400">@elmivet_impex</span>
                       </a>
                       <a 
                         href="https://www.tiktok.com/@clearing_forwarding?_r=1&_t=ZS-9AEqs29ADt1" 
@@ -312,7 +309,7 @@ export default function Footer() {
                         rel="noreferrer"
                         className="block px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-200 hover:text-white transition-colors"
                       >
-                        • Logistics & Clearing: <span className="text-[#D9232D]">@clearing_forwarding</span>
+                        • Logistics & Clearing: <span className="text-amber-400">@clearing_forwarding</span>
                       </a>
                     </div>
                   </div>
@@ -354,21 +351,12 @@ export default function Footer() {
             <span className="hover:text-slate-200 cursor-pointer transition-colors">Bonded Terminal Compliance</span>
             <span className="hover:text-slate-200 cursor-pointer transition-colors">Customs Brokerage Terms</span>
             <span className="hover:text-slate-200 cursor-pointer transition-colors">Privacy Policy</span>
-            
-            {/* Back to Top Button */}
-            <button
-              onClick={scrollToTop}
-              className="flex items-center space-x-1.5 text-xs text-[#D9232D] hover:text-white bg-slate-900 hover:bg-[#D9232D] px-3 py-1 rounded-sm border border-slate-800 transition-all duration-200 shadow-xs cursor-pointer font-semibold ml-0 md:ml-4"
-              aria-label="Scroll to top of page"
-            >
-              <span>Back to Top</span>
-              <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-                <path d="M12 4l-8 8h5v8h6v-8h5z" />
-              </svg>
-            </button>
           </div>
         </div>
       </div>
+
+      {/* Floating back-to-top button (fixed bottom-right, appears on scroll) */}
+      <BackToTop />
     </footer>
   );
 }

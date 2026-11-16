@@ -86,18 +86,33 @@ function ImagePlaceholder({ tag, label, className = "aspect-video" }) {
 }
 
 /* ==========================================================================
-   Data
-   Full class strings are kept static so Tailwind v4 can detect them.
-   ========================================================================== */
-const CATEGORIES = [
-  "All",
-  "Regulatory Notice",
-  "Port Operations",
-  "Global Logistics",
-  "Guangdong Hub",
-];
+   1. CONTENT PROVIDER (temporary)
+   --------------------------------------------------------------------------
+   The ONLY part of this file that knows where Global Insights content comes
+   from. Today it returns the hardcoded articles below. When the CMS is
+   connected, replace the body of getGlobalInsightContent() so it returns the
+   same shape. Nothing in sections 2 and 3 needs to change.
 
-const HERO = {
+   Article shape
+     {
+       id,         required, unique (string or number)
+       title,      required
+       category,   required, one of CATEGORIES below
+       tag,        optional, label on the image (falls back to category)
+       excerpt,    optional
+       date,       optional, display text
+       readTime,   optional, display text
+       author,     optional, display text (featured article only)
+       imageAlt,   optional, accessible label for the image area
+     }
+
+   Content shape
+     { featured: Article | null, articles: Article[] }
+
+   Layout (column widths, "large" cards) is NOT part of the content.
+   ========================================================================== */
+const FEATURED_ARTICLE = {
+  id: "hero",
   tag: "Industrial Cargo / Bonded Warehousing",
   category: "Guangdong Hub",
   title:
@@ -107,24 +122,12 @@ const HERO = {
   date: "November 6, 2026",
   readTime: "7 min read",
   author: "Elmivet Editorial Desk",
+  imageAlt: "Guangdong bonded warehouse and container yard",
 };
 
-const POSTS = [
-  {
-    id: 1,
-    span: "lg:col-span-7",
-    category: "Regulatory Notice",
-    tag: "Customs & Compliance",
-    title: "Updated Declaration Requirements for Electronics and Machinery Exports",
-    excerpt:
-      "Exporters should review revised documentation checklists and HS code declarations before the next booking cycle to avoid clearance holds.",
-    date: "Nov 4, 2026",
-    readTime: "5 min read",
-    large: true,
-  },
+const ARTICLES = [
   {
     id: 2,
-    span: "lg:col-span-5",
     category: "Port Operations",
     tag: "Port Operations",
     title: "Berth Scheduling Changes Affecting Lagos-Bound Consolidated Cargo",
@@ -135,7 +138,6 @@ const POSTS = [
   },
   {
     id: 3,
-    span: "lg:col-span-4",
     category: "Global Logistics",
     tag: "Ocean Freight",
     title: "Ocean Freight Rate Outlook for the Fourth Quarter",
@@ -146,7 +148,6 @@ const POSTS = [
   },
   {
     id: 4,
-    span: "lg:col-span-4",
     category: "Regulatory Notice",
     tag: "Import Duties",
     title: "Reminder: Pre-Shipment Inspection Rules for Nigerian Importers",
@@ -157,7 +158,6 @@ const POSTS = [
   },
   {
     id: 5,
-    span: "lg:col-span-4",
     category: "Guangdong Hub",
     tag: "Warehouse Update",
     title: "New Cut-Off Times for Guangdong Hub Cargo Receiving",
@@ -168,7 +168,6 @@ const POSTS = [
   },
   {
     id: 6,
-    span: "lg:col-span-5",
     category: "Global Logistics",
     tag: "Supply Chain",
     title: "Building Resilient Supply Chains Across Two Continents",
@@ -179,7 +178,6 @@ const POSTS = [
   },
   {
     id: 7,
-    span: "lg:col-span-7",
     category: "Port Operations",
     tag: "Terminal Notice",
     title: "Terminal Congestion Watch: Dwell Times at Major West African Ports",
@@ -187,9 +185,250 @@ const POSTS = [
       "Our weekly read on yard density, discharge delays and what they mean for delivery planning and demurrage exposure.",
     date: "Oct 17, 2026",
     readTime: "6 min read",
-    large: true,
   },
 ];
+
+function getGlobalInsightContent() {
+  return { featured: FEATURED_ARTICLE, articles: ARTICLES };
+}
+
+/* ==========================================================================
+   2. SELECTION LOGIC (pure functions, no JSX)
+   ========================================================================== */
+const CATEGORIES = [
+  "All",
+  "Regulatory Notice",
+  "Port Operations",
+  "Global Logistics",
+  "Guangdong Hub",
+];
+
+function filterByCategory(articles, category) {
+  return category === "All"
+    ? articles
+    : articles.filter((article) => article.category === category);
+}
+
+/* Row widths on the 12-column desktop grid.
+   Rows alternate pair (7/5, then 5/7, ...) and triple (4/4/4), starting with
+   a pair, so 7 articles give exactly 7/5, 4/4/4, 5/7. The tail is adjusted so
+   every row totals 12 and no stray card is left behind:
+     3 left -> a triple      2 left -> a pair
+     4 left -> two pairs     1 article in total -> one centred card (8 wide)
+   Widths depend only on position, never on article ids. */
+const PAIR_ROWS = [
+  [7, 5],
+  [5, 7],
+];
+const TRIPLE_ROW = [4, 4, 4];
+const SINGLE_ROW = [8];
+
+function buildRowLayout(count) {
+  const rows = [];
+  let remaining = count;
+  let pairsPlaced = 0;
+
+  const placePair = () => {
+    rows.push([...PAIR_ROWS[pairsPlaced % 2]]);
+    pairsPlaced += 1;
+    remaining -= 2;
+  };
+
+  while (remaining > 0) {
+    if (remaining === 1) {
+      rows.push([...SINGLE_ROW]);
+      remaining = 0;
+    } else if (remaining === 2) {
+      placePair();
+    } else if (remaining === 3) {
+      rows.push([...TRIPLE_ROW]);
+      remaining = 0;
+    } else if (remaining === 4) {
+      placePair();
+      placePair();
+    } else if (rows.length % 2 === 0) {
+      placePair();
+    } else {
+      rows.push([...TRIPLE_ROW]);
+      remaining -= 3;
+    }
+  }
+  return rows;
+}
+
+/* ==========================================================================
+   3. PRESENTATION (receives content through props only)
+   Full class strings are kept static so Tailwind v4 can detect them.
+   ========================================================================== */
+const SPAN_CLASSES = {
+  4: "lg:col-span-4",
+  5: "lg:col-span-5",
+  7: "lg:col-span-7",
+  8: "lg:col-span-8 lg:col-start-3",
+};
+const LARGE_FROM_SPAN = 7;
+
+function FeaturedArticle({ article, isOpened, onOpen }) {
+  return (
+    <Reveal>
+      <article className="overflow-hidden border border-slate-200 bg-white shadow-lg">
+        <div className="grid lg:grid-cols-5">
+          <div className="lg:col-span-3">
+            <ImagePlaceholder
+              tag={article.tag ?? article.category}
+              label={article.imageAlt ?? `${article.title} header image`}
+              className="aspect-video lg:aspect-auto lg:h-full lg:min-h-[26rem]"
+            />
+          </div>
+
+          <div className="flex flex-col justify-center p-6 sm:p-10 lg:col-span-2">
+            <div className="flex flex-wrap items-center gap-3 font-sans text-xs">
+              <span className="bg-[#D9232D] px-2.5 py-1 font-semibold uppercase tracking-widest text-white">
+                Latest Dispatch
+              </span>
+              {article.date && (
+                <span className="font-medium text-slate-500">{article.date}</span>
+              )}
+              {article.date && article.readTime && (
+                <span className="text-slate-300" aria-hidden="true">|</span>
+              )}
+              {article.readTime && (
+                <span className="font-medium text-slate-500">{article.readTime}</span>
+              )}
+            </div>
+
+            <h2 className="mt-5 font-serif text-2xl font-bold leading-snug text-[#0A2540] sm:text-3xl">
+              {article.title}
+            </h2>
+
+            {article.excerpt && (
+              <p className="mt-4 font-sans leading-relaxed text-slate-600">
+                {article.excerpt}
+              </p>
+            )}
+
+            {article.author && (
+              <div className="mt-6 flex items-center gap-3">
+                <span
+                  aria-hidden="true"
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0A2540] font-sans text-xs font-bold text-white"
+                >
+                  E
+                </span>
+                <span className="border border-slate-300 px-3 py-1 font-sans text-xs font-semibold text-[#0A2540]">
+                  By {article.author}
+                </span>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => onOpen(article.id)}
+              aria-pressed={isOpened}
+              className="mt-8 w-fit bg-[#0A2540] px-6 py-3 font-sans text-sm font-semibold text-white transition-colors hover:bg-[#071a2e]"
+            >
+              Read Full Dispatch →
+            </button>
+          </div>
+        </div>
+      </article>
+    </Reveal>
+  );
+}
+
+function ArticleCard({ article, large, isOpened, onOpen }) {
+  return (
+    <article className="group flex h-full flex-col border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-lg">
+      <ImagePlaceholder
+        tag={article.tag ?? article.category}
+        label={`${article.title} header image`}
+        className={large ? "aspect-video lg:aspect-[2/1]" : "aspect-video"}
+      />
+
+      <div className="flex flex-1 flex-col p-6">
+        {article.category && (
+          <span className="w-fit border-l-[3px] border-[#D9232D] pl-2 font-sans text-xs font-semibold uppercase tracking-widest text-[#D9232D]">
+            {article.category}
+          </span>
+        )}
+
+        <h3
+          className={`mt-3 font-serif font-bold leading-snug text-[#0A2540] ${
+            large ? "text-2xl" : "text-xl"
+          }`}
+        >
+          {article.title}
+        </h3>
+
+        {article.excerpt ? (
+          <p className="mt-3 flex-1 font-sans text-sm leading-relaxed text-slate-600">
+            {article.excerpt}
+          </p>
+        ) : (
+          <div className="flex-1" />
+        )}
+
+        <div className="mt-6 flex items-center justify-between border-t border-slate-200 pt-4 font-sans text-xs text-slate-500">
+          <span>
+            {article.date}
+            {article.date && article.readTime && (
+              <span className="mx-2 text-slate-300" aria-hidden="true">|</span>
+            )}
+            {article.readTime}
+          </span>
+          <button
+            type="button"
+            onClick={() => onOpen(article.id)}
+            aria-pressed={isOpened}
+            aria-label={`View article: ${article.title}`}
+            className="font-semibold text-[#0A2540] transition-colors hover:text-[#D9232D]"
+          >
+            {isOpened ? "Opened ✓" : "View →"}
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function ArticleGrid({ articles, opened, onOpen }) {
+  const spans = buildRowLayout(articles.length).flat();
+
+  return (
+    <div className="editorial-grid mt-10 !grid-cols-1 gap-8 lg:!grid-cols-12">
+      {articles.map((article, i) => (
+        <Reveal
+          key={article.id}
+          delay={(i % 3) * 90}
+          className={SPAN_CLASSES[spans[i]]}
+        >
+          <ArticleCard
+            article={article}
+            large={spans[i] >= LARGE_FROM_SPAN}
+            isOpened={opened === article.id}
+            onOpen={onOpen}
+          />
+        </Reveal>
+      ))}
+    </div>
+  );
+}
+
+function NewsroomEmptyState() {
+  return (
+    <Reveal className="mt-10">
+      <div className="border border-slate-200 bg-white p-8 text-center shadow-sm sm:p-12">
+        <p className="font-serif text-2xl font-bold text-[#0A2540]">
+          No dispatches published yet
+        </p>
+        <p className="mx-auto mt-3 max-w-xl font-sans text-sm leading-relaxed text-slate-600">
+          Regulatory notices, port updates and Guangdong hub announcements will
+          appear here as soon as they are published.
+        </p>
+      </div>
+    </Reveal>
+  );
+}
 
 /* ==========================================================================
    Page
@@ -198,8 +437,10 @@ export default function GlobalInsight() {
   const [active, setActive] = useState("All");
   const [opened, setOpened] = useState(null);
 
-  const visiblePosts =
-    active === "All" ? POSTS : POSTS.filter((p) => p.category === active);
+  const { featured, articles } = getGlobalInsightContent();
+  const hasFeatured = Boolean(featured?.title);
+  const visibleArticles = filterByCategory(articles, active);
+  const hasArticles = articles.length > 0;
 
   return (
     <main className="bg-slate-50 text-slate-700">
@@ -231,62 +472,19 @@ export default function GlobalInsight() {
 
       <div className="container section-padding">
         {/* ---------------- 2. Hero article ---------------- */}
-        <Reveal>
-          <article className="overflow-hidden border border-slate-200 bg-white shadow-lg">
-            <div className="grid lg:grid-cols-5">
-              <div className="lg:col-span-3">
-                <ImagePlaceholder
-                  tag={HERO.tag}
-                  label="Guangdong bonded warehouse and container yard"
-                  className="aspect-video lg:aspect-auto lg:h-full lg:min-h-[26rem]"
-                />
-              </div>
-
-              <div className="flex flex-col justify-center p-6 sm:p-10 lg:col-span-2">
-                <div className="flex flex-wrap items-center gap-3 font-sans text-xs">
-                  <span className="bg-[#D9232D] px-2.5 py-1 font-semibold uppercase tracking-widest text-white">
-                    Latest Dispatch
-                  </span>
-                  <span className="font-medium text-slate-500">{HERO.date}</span>
-                  <span className="text-slate-300" aria-hidden="true">|</span>
-                  <span className="font-medium text-slate-500">{HERO.readTime}</span>
-                </div>
-
-                <h2 className="mt-5 font-serif text-2xl font-bold leading-snug text-[#0A2540] sm:text-3xl">
-                  {HERO.title}
-                </h2>
-
-                <p className="mt-4 font-sans leading-relaxed text-slate-600">
-                  {HERO.excerpt}
-                </p>
-
-                <div className="mt-6 flex items-center gap-3">
-                  <span
-                    aria-hidden="true"
-                    className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0A2540] font-sans text-xs font-bold text-white"
-                  >
-                    E
-                  </span>
-                  <span className="border border-slate-300 px-3 py-1 font-sans text-xs font-semibold text-[#0A2540]">
-                    By {HERO.author}
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setOpened("hero")}
-                  aria-pressed={opened === "hero"}
-                  className="mt-8 w-fit bg-[#0A2540] px-6 py-3 font-sans text-sm font-semibold text-white transition-colors hover:bg-[#071a2e]"
-                >
-                  Read Full Dispatch →
-                </button>
-              </div>
-            </div>
-          </article>
-        </Reveal>
+        {hasFeatured && (
+          <FeaturedArticle
+            article={featured}
+            isOpened={opened === featured.id}
+            onOpen={setOpened}
+          />
+        )}
 
         {/* ---------------- 3. News feed ---------------- */}
-        <section aria-labelledby="feed-heading" className="mt-16">
+        <section
+          aria-labelledby="feed-heading"
+          className={hasFeatured ? "mt-16" : ""}
+        >
           <div className="flex flex-col gap-5 border-b border-slate-300 pb-5 md:flex-row md:items-end md:justify-between">
             <h2
               id="feed-heading"
@@ -295,91 +493,50 @@ export default function GlobalInsight() {
               Newsroom Feed
             </h2>
 
-            <div
-              role="group"
-              aria-label="Filter news by category"
-              className="flex flex-wrap gap-2"
-            >
-              {CATEGORIES.map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setActive(cat)}
-                  aria-pressed={active === cat}
-                  className={`border px-3.5 py-1.5 font-sans text-xs font-semibold transition-colors ${
-                    active === cat
-                      ? "border-[#0A2540] bg-[#0A2540] text-white"
-                      : "border-slate-300 bg-white text-slate-600 hover:border-[#0A2540] hover:text-[#0A2540]"
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* key remounts cards so the entrance animation replays on filter */}
-          <div
-            key={active}
-            className="editorial-grid mt-10 !grid-cols-1 gap-8 lg:!grid-cols-12"
-          >
-            {visiblePosts.map((post, i) => (
-              <Reveal
-                key={post.id}
-                delay={(i % 3) * 90}
-                className={active === "All" ? post.span : "lg:col-span-4"}
+            {hasArticles && (
+              <div
+                role="group"
+                aria-label="Filter news by category"
+                className="flex flex-wrap gap-2"
               >
-                <article className="group flex h-full flex-col border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-lg">
-                  <ImagePlaceholder
-                    tag={post.tag}
-                    label={`${post.title} header image`}
-                    className={post.large ? "aspect-video lg:aspect-[2/1]" : "aspect-video"}
-                  />
-
-                  <div className="flex flex-1 flex-col p-6">
-                    <span className="w-fit border-l-[3px] border-[#D9232D] pl-2 font-sans text-xs font-semibold uppercase tracking-widest text-[#D9232D]">
-                      {post.category}
-                    </span>
-
-                    <h3
-                      className={`mt-3 font-serif font-bold leading-snug text-[#0A2540] ${
-                        post.large ? "text-2xl" : "text-xl"
-                      }`}
-                    >
-                      {post.title}
-                    </h3>
-
-                    <p className="mt-3 flex-1 font-sans text-sm leading-relaxed text-slate-600">
-                      {post.excerpt}
-                    </p>
-
-                    <div className="mt-6 flex items-center justify-between border-t border-slate-200 pt-4 font-sans text-xs text-slate-500">
-                      <span>
-                        {post.date}
-                        <span className="mx-2 text-slate-300" aria-hidden="true">|</span>
-                        {post.readTime}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setOpened(post.id)}
-                        aria-pressed={opened === post.id}
-                        aria-label={`View article: ${post.title}`}
-                        className="font-semibold text-[#0A2540] transition-colors hover:text-[#D9232D]"
-                      >
-                        {opened === post.id ? "Opened ✓" : "View →"}
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              </Reveal>
-            ))}
+                {CATEGORIES.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setActive(cat)}
+                    aria-pressed={active === cat}
+                    className={`border px-3.5 py-1.5 font-sans text-xs font-semibold transition-colors ${
+                      active === cat
+                        ? "border-[#0A2540] bg-[#0A2540] text-white"
+                        : "border-slate-300 bg-white text-slate-600 hover:border-[#0A2540] hover:text-[#0A2540]"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          {visiblePosts.length === 0 && (
-            <p className="mt-10 font-sans text-slate-500">
-              No updates in this category yet. Check back soon or choose another
-              category.
-            </p>
+          {hasArticles ? (
+            <>
+              {/* key remounts cards so the entrance animation replays on filter */}
+              <ArticleGrid
+                key={active}
+                articles={visibleArticles}
+                opened={opened}
+                onOpen={setOpened}
+              />
+
+              {visibleArticles.length === 0 && (
+                <p className="mt-10 font-sans text-slate-500">
+                  No updates in this category yet. Check back soon or choose another
+                  category.
+                </p>
+              )}
+            </>
+          ) : (
+            <NewsroomEmptyState />
           )}
         </section>
 
