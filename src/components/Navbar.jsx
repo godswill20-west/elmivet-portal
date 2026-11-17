@@ -201,12 +201,47 @@ function validateConsultation(values, fields = CONSULT_FIELDS) {
   return errors;
 }
 
-/* Mock backend call. Replace with a real POST; add any hidden copy server-side. */
+const CONSULT_ENDPOINT = '/api/submit-consultation';
+const CONSULT_TIMEOUT_MS = 35000; // a little above the server's 30s limit
+const CONSULT_GENERIC_ERROR = 'We could not send your request. Please try again.';
+const CONSULT_NETWORK_ERROR =
+  'We could not reach our servers. Please check your connection and try again.';
+
+// Matches the server's reference format: ELM-ADV- followed by 6-16 characters of A-Z / 0-9.
+const newConsultReference = () =>
+  `ELM-ADV-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+
+/* Real backend call. Never throws: resolves to { ok: true } or { ok: false, error }. */
 async function submitConsultation(payload) {
-  console.info('[Elmivet consultation request]', payload);
-  // await fetch("/api/consultations", { method: "POST", body: JSON.stringify(payload) });
-  await new Promise((r) => setTimeout(r, 900));
-  return { ok: true };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CONSULT_TIMEOUT_MS);
+  try {
+    const response = await fetch(CONSULT_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+
+    let data = null;
+    try {
+      data = await response.json();
+    } catch {
+      data = null;
+    }
+
+    if (response.ok && data && data.success === true) return { ok: true };
+
+    const message =
+      data && typeof data.error === 'string' && data.error.trim()
+        ? data.error.trim().slice(0, 200)
+        : CONSULT_GENERIC_ERROR;
+    return { ok: false, error: message };
+  } catch {
+    return { ok: false, error: CONSULT_NETWORK_ERROR };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 const nowForDateTimeInput = () => {
@@ -380,6 +415,9 @@ function ConsultationModal({ onClose }) {
   const [errors, setErrors] = useState({});
   const [sending, setSending] = useState(false);
   const [reference, setReference] = useState(null);
+  const [submitError, setSubmitError] = useState('');
+  const inFlightRef = useRef(false); // synchronous guard against double submits (state updates are async)
+  const attemptRef = useRef(null); // keeps the same reference when retrying an unchanged request
   const [minDateTime] = useState(nowForDateTimeInput);
 
   const setValue = (name, value) => {
@@ -413,6 +451,7 @@ function ConsultationModal({ onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (inFlightRef.current) return; // a request is already processing
     // Pressing Enter on the first step advances instead of submitting
     if (step < lastStep) {
       handleNext();
@@ -431,25 +470,48 @@ function ConsultationModal({ onClose }) {
       document.getElementById(`${formId}-${first}`)?.focus();
       return;
     }
-    const ref = `ELM-ADV-${Date.now().toString(36).toUpperCase()}`;
+    // Honeypot filled: show the usual screen to the bot, but send nothing
     if (honeypot) {
-      setReference(ref);
+      setReference(newConsultReference());
       return;
     }
 
-    const answers = {};
-    CONSULT_FIELDS.forEach((fd) => {
-      answers[fd.label] = values[fd.name] ?? '';
-    });
+    const field = (name) => String(values[name] ?? '').trim();
+    const fields = {
+      clientName: field('clientName'),
+      clientType: field('clientType'),
+      email: field('email'),
+      phone: field('phone'),
+      division: field('division'),
+      area: field('area'),
+      challenge: field('challenge'),
+      method: field('method'),
+      schedule: field('schedule'),
+    };
 
+    // Retrying an unchanged request reuses its reference (the server treats that as a safe retry);
+    // an edited request gets a new reference.
+    const signature = JSON.stringify(fields);
+    if (!attemptRef.current || attemptRef.current.signature !== signature) {
+      attemptRef.current = { signature, reference: newConsultReference() };
+    }
+    const ref = attemptRef.current.reference;
+
+    inFlightRef.current = true;
+    setSubmitError('');
     setSending(true);
-    await submitConsultation({
-      subject: 'Executive Advisory Session Request',
-      reference: ref,
-      answers,
-    });
-    setSending(false);
-    setReference(ref);
+    try {
+      const result = await submitConsultation({ reference: ref, ...fields, website: '' });
+      if (result.ok) {
+        attemptRef.current = null;
+        setReference(ref); // Thank You screen only after the server confirms success
+        return;
+      }
+      setSubmitError(result.error);
+    } finally {
+      inFlightRef.current = false;
+      setSending(false);
+    }
   };
 
   if (reference) {
@@ -556,6 +618,12 @@ function ConsultationModal({ onClose }) {
         {Object.keys(errors).length > 0 && (
           <p role="alert" className="mt-6 border-l-4 border-[#D9232D] bg-red-50 px-4 py-3 font-sans text-sm text-[#D9232D]">
             Please correct the highlighted fields and {step < lastStep ? 'continue' : 'submit again'}.
+          </p>
+        )}
+
+        {submitError && (
+          <p role="alert" className="mt-6 border-l-4 border-[#D9232D] bg-red-50 px-4 py-3 font-sans text-sm text-[#D9232D]">
+            {submitError}
           </p>
         )}
 
