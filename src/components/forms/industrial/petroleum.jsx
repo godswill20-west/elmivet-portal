@@ -13,14 +13,6 @@ const QUOTES_TO = "quotes@elmivet.com";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const text = (name, label, x = {}) => ({ name, label, type: "text", ...x });
 const area = (name, label, x = {}) => ({ name, label, type: "textarea", ...x });
-const radio = (name, label, options, x = {}) => ({
-  name,
-  label,
-  type: "radio",
-  options,
-  required: true,
-  ...x,
-});
 const select = (name, label, options, x = {}) => ({
   name,
   label,
@@ -46,7 +38,7 @@ const PETROLEUM_SUBJECT_PREFIX = "[New Petroleum Marketing Lead] \u2013 ";
 
 /* Set this to the real server endpoint when it exists. While it is empty the form refuses to
    claim success and shows an error instead. */
-const PETROLEUM_SUBMIT_ENDPOINT = "";
+const PETROLEUM_SUBMIT_ENDPOINT = "/api/submit-quote";
 
 /* Option wording is copied from the specification. Two items look like typos in it
    ("Jet AI" probably Jet A1, "Sides Ex-Depot Pickup" probably a different first word);
@@ -323,7 +315,7 @@ export default function PetroleumForm({ service, onClose, onSent }) {
     submittingRef.current = true;
     setSending(true);
     setSendFailed(false);
-    let result = { ok: false };
+    let result;
     try {
       result = await submitPetroleumQuote(buildPetroleumPayload(values, reference));
     } catch {

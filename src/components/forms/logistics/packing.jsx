@@ -46,7 +46,7 @@ const PACKING_SUBMIT_LABEL = "Submit Packing & Removal Request";
 const PACKING_SUBJECT_PREFIX = "[New Packing & Removal Request] \u2013 ";
 
 /* Set to the real server endpoint when it exists. While empty, the form refuses to claim success. */
-const PACKING_SUBMIT_ENDPOINT = "";
+const PACKING_SUBMIT_ENDPOINT = "/api/submit-quote";
 
 const PACKING_MOVE_TYPE_OPTIONS = [
   { code: "residential_move", label: "\u{1F3E0} Residential Move" },
@@ -311,7 +311,7 @@ export default function PackingRemovalForm({ service, onClose, onSent }) {
     submittingRef.current = true;
     setSending(true);
     setSendFailed(false);
-    let result = { ok: false };
+    let result;
     try {
       result = await submitPackingQuote(buildPackingPayload(values, reference));
     } catch {

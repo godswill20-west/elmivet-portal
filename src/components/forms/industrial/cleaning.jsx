@@ -13,14 +13,7 @@ const QUOTES_TO = "quotes@elmivet.com";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const text = (name, label, x = {}) => ({ name, label, type: "text", ...x });
 const area = (name, label, x = {}) => ({ name, label, type: "textarea", ...x });
-const radio = (name, label, options, x = {}) => ({
-  name,
-  label,
-  type: "radio",
-  options,
-  required: true,
-  ...x,
-});
+
 const select = (name, label, options, x = {}) => ({
   name,
   label,
@@ -46,7 +39,7 @@ const CLEANING_SUBJECT_PREFIX = "[New Cleaning Services Lead] \u2013 ";
 
 /* Set this to the real server endpoint when it exists. While it is empty the form refuses to
    claim success and shows an error instead. */
-const CLEANING_SUBMIT_ENDPOINT = "";
+const CLEANING_SUBMIT_ENDPOINT = "/api/submit-quote";
 
 const CLEANING_CATEGORY_OPTIONS = [
   { code: "industrial_factory_deep_cleaning", label: "Industrial/Factory Deep Cleaning" },
@@ -299,7 +292,7 @@ export default function CleaningForm({ service, onClose, onSent }) {
     submittingRef.current = true;
     setSending(true);
     setSendFailed(false);
-    let result = { ok: false };
+    let result;
     try {
       result = await submitCleaningQuote(buildCleaningPayload(values, reference));
     } catch {

@@ -43,7 +43,7 @@ const CHINA_SUBJECT_PREFIX = "[New China Freight Lead] \u2013 ";
 
 /* Set this to the real server endpoint when it exists. While it is empty the form refuses to
    claim success and shows an error instead. */
-const ENDPOINT = "";
+const ENDPOINT = "/api/submit-quote";
 
 /* Option lists. `label` is the exact client-facing wording; `code` is the stable internal value
    sent to the backend. The form state stores the label (that is what the shared Field renders). */

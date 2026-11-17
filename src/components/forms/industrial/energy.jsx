@@ -46,7 +46,7 @@ const ENERGY_SUBJECT_PREFIX = "[New Energy Solutions Lead] \u2013 ";
 
 /* Set this to the real server endpoint when it exists. While it is empty the form refuses to
    claim success and shows an error instead. */
-const ENERGY_SUBMIT_ENDPOINT = "";
+const ENERGY_SUBMIT_ENDPOINT = "/api/submit-quote";
 
 const ENERGY_SOLUTION_OPTIONS = [
   { code: "industrial_solar_installation", label: "Industrial Solar Installation" },
@@ -291,7 +291,7 @@ export default function EnergyForm({ service, onClose, onSent }) {
     submittingRef.current = true;
     setSending(true);
     setSendFailed(false);
-    let result = { ok: false };
+    let result;
     try {
       result = await submitEnergyQuote(buildEnergyPayload(values, reference));
     } catch {

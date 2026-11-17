@@ -46,7 +46,7 @@ const CUSTOMS_SUBMIT_LABEL = "Submit Clearing Request";
 const CUSTOMS_SUBJECT_PREFIX = "[New Clearing & Customs Request] \u2013 ";
 
 /* Set to the real server endpoint when it exists. While empty, the form refuses to claim success. */
-const CUSTOMS_SUBMIT_ENDPOINT = "";
+const CUSTOMS_SUBMIT_ENDPOINT = "/api/submit-quote";
 
 const CUSTOMS_MAX_FILES = 5;
 const CUSTOMS_MAX_TOTAL_BYTES = 25 * 1024 * 1024;

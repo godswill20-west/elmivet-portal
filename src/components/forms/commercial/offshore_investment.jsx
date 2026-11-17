@@ -54,7 +54,7 @@ const OFFSHORE_MEMBER_MESSAGE =
 
 /* Set this to the real server endpoint when it exists. While it is empty the form refuses to
    claim success and shows an error instead. */
-const OFFSHORE_SUBMIT_ENDPOINT = "";
+const OFFSHORE_SUBMIT_ENDPOINT = "/api/submit-quote";
 
 const OFFSHORE_MEMBER_A = {
   code: "registered_member",

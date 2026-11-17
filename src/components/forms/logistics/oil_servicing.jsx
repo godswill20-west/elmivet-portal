@@ -47,7 +47,7 @@ const MB = 1024 * 1024;
 
 /* Set this to the real server endpoint when it exists. While it is empty the form refuses to
    claim success and shows an error instead. */
-const OIL_SUBMIT_ENDPOINT = "";
+const OIL_SUBMIT_ENDPOINT = "/api/submit-quote";
 
 const OIL_CLIENT_MANDATE = {
   code: "authorized_mandate_broker_facilitator",
@@ -368,7 +368,7 @@ export default function OilServicingForm({ service, onClose, onSent }) {
     submittingRef.current = true;
     setSending(true);
     setSendFailed(false);
-    let result = { ok: false };
+    let result;
     try {
       result = await submitOilQuote(buildOilPayload(values, reference, filesByField));
     } catch {

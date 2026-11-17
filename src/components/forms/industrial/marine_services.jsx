@@ -40,7 +40,7 @@ const MARINE_MAX_FILE_BYTES = 5 * 1024 * 1024; // 5MB
 
 /* Set this to the real server endpoint when it exists. While it is empty the form refuses to
    claim success and shows an error instead. */
-const ENDPOINT = "";
+const ENDPOINT = "/api/submit-quote";
 
 const MARINE_CLIENT_TYPE_OPTIONS = [
   { code: "shipowner_fleet_manager", label: "Shipowner / Fleet Manager" },
@@ -344,7 +344,7 @@ export default function MarineServicesForm({ service, onClose, onSent }) {
     submittingRef.current = true;
     setSending(true);
     setSendFailed(false);
-    let result = { ok: false };
+    let result;
     try {
       result = await submitMarineQuote(buildMarinePayload(values, files, reference));
     } catch {

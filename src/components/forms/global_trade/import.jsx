@@ -46,7 +46,7 @@ const IMPORT_SUBMIT_LABEL = "Submit Request";
 const IMPORT_SUBJECT_PREFIX = "[New Import & Export Request] \u2013 ";
 
 /* Set to the real server endpoint when it exists. While empty, the form refuses to claim success. */
-const IMPORT_SUBMIT_ENDPOINT = "";
+const IMPORT_SUBMIT_ENDPOINT = "/api/submit-quote";
 
 const IMPORT_DIRECTION_OPTIONS = [
   { code: "import", label: "Import (Inbound to West Africa)" },
@@ -311,7 +311,7 @@ export default function ImportExportForm({ service, onClose, onSent }) {
     submittingRef.current = true;
     setSending(true);
     setSendFailed(false);
-    let result = { ok: false };
+    let result;
     try {
       result = await submitImportQuote(buildImportPayload(values, reference));
     } catch {

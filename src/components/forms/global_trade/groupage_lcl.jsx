@@ -61,7 +61,7 @@ const GROUPAGE_SUBMIT_LABEL = "Submit Groupage Request";
 const GROUPAGE_SUBJECT_PREFIX = "[New Groupage Request] \u2013 ";
 
 /* Set to the real server endpoint when it exists. While empty, the form refuses to claim success. */
-const GROUPAGE_SUBMIT_ENDPOINT = "";
+const GROUPAGE_SUBMIT_ENDPOINT = "/api/submit-quote";
 
 const GROUPAGE_CLIENT_TYPE_OPTIONS = [
   { code: "importer", label: "Importer" },
@@ -388,7 +388,7 @@ export default function GroupageLclForm({ service, onClose, onSent }) {
     submittingRef.current = true;
     setSending(true);
     setSendFailed(false);
-    let result = { ok: false };
+    let result;
     try {
       result = await submitGroupageQuote(buildGroupagePayload(values, reference));
     } catch {

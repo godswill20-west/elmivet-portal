@@ -38,7 +38,7 @@ const DOMESTIC_SUBMIT_LABEL = "Submit Haulage Request";
 const DOMESTIC_SUBJECT_PREFIX = "[New Domestic Bulk Haulage Request] \u2013 ";
 
 /* Set to the real server endpoint when it exists. While empty, the form refuses to claim success. */
-const DOMESTIC_SUBMIT_ENDPOINT = "";
+const DOMESTIC_SUBMIT_ENDPOINT = "/api/submit-quote";
 
 const DOMESTIC_COMMODITY_OPTIONS = [
   { code: "dry_aggregates", label: "Dry Aggregates (Granite, Sand, Gravel)" },
@@ -303,7 +303,7 @@ export default function DomesticBulkHaulageForm({ service, onClose, onSent }) {
     submittingRef.current = true;
     setSending(true);
     setSendFailed(false);
-    let result = { ok: false };
+    let result;
     try {
       result = await submitDomesticQuote(buildDomesticPayload(values, reference));
     } catch {

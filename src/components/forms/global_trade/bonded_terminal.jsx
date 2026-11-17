@@ -38,7 +38,7 @@ const BONDED_SUBMIT_LABEL = "Submit Terminal Request";
 const BONDED_SUBJECT_PREFIX = "[New Bonded Terminal Request] \u2013 ";
 
 /* Set to the real server endpoint when it exists. While empty, the form refuses to claim success. */
-const BONDED_SUBMIT_ENDPOINT = "";
+const BONDED_SUBMIT_ENDPOINT = "/api/submit-quote";
 
 const BONDED_MAX_FILES = 5;
 const BONDED_MAX_TOTAL_BYTES = 25 * 1024 * 1024;

@@ -46,7 +46,7 @@ const OCEAN_SUBMIT_LABEL = "Submit Freight Request";
 const OCEAN_SUBJECT_PREFIX = "[New Freight Forwarding Request] \u2013 ";
 
 /* Set to the real server endpoint when it exists. While empty, the form refuses to claim success. */
-const OCEAN_SUBMIT_ENDPOINT = "";
+const OCEAN_SUBMIT_ENDPOINT = "/api/submit-quote";
 
 const OCEAN_MAX_FILES = 5;
 const OCEAN_MAX_TOTAL_BYTES = 25 * 1024 * 1024;
@@ -340,7 +340,7 @@ export default function OceanFreightForm({ service, onClose, onSent }) {
     submittingRef.current = true;
     setSending(true);
     setSendFailed(false);
-    let result = { ok: false };
+    let result;
     try {
       result = await submitOceanQuote(buildOceanPayload(values, files, reference));
     } catch {

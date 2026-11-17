@@ -13,14 +13,6 @@ const QUOTES_TO = "quotes@elmivet.com";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const text = (name, label, x = {}) => ({ name, label, type: "text", ...x });
 const area = (name, label, x = {}) => ({ name, label, type: "textarea", ...x });
-const radio = (name, label, options, x = {}) => ({
-  name,
-  label,
-  type: "radio",
-  options,
-  required: true,
-  ...x,
-});
 const select = (name, label, options, x = {}) => ({
   name,
   label,
@@ -46,7 +38,7 @@ const FABRICATION_SUBJECT_PREFIX = "[New Fabrication & Construction Lead] \u2013
 
 /* Set this to the real server endpoint when it exists. While it is empty the form refuses to
    claim success and shows an error instead. */
-const FABRICATION_SUBMIT_ENDPOINT = "";
+const FABRICATION_SUBMIT_ENDPOINT = "/api/submit-quote";
 
 const FABRICATION_CATEGORY_OPTIONS = [
   { code: "structural_steel_fabrication", label: "Structural Steel Fabrication" },
@@ -296,7 +288,7 @@ export default function FabricationForm({ service, onClose, onSent }) {
     submittingRef.current = true;
     setSending(true);
     setSendFailed(false);
-    let result = { ok: false };
+    let result;
     try {
       result = await submitFabricationQuote(buildFabricationPayload(values, reference, files));
     } catch {

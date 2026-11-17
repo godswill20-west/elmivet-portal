@@ -56,7 +56,7 @@ const HAULAGE_SUBJECT_PREFIX = "[New Road Haulage Request] \u2013 ";
 const HAULAGE_PHONE_DEFAULT = "+234 ";
 
 /* Set to the real server endpoint when it exists. While empty, the form refuses to claim success. */
-const HAULAGE_SUBMIT_ENDPOINT = "";
+const HAULAGE_SUBMIT_ENDPOINT = "/api/submit-quote";
 
 const HAULAGE_CLIENT_TYPE_OPTIONS = [
   { code: "corporate_client", label: "Corporate Client" },
@@ -345,7 +345,7 @@ export default function RoadHaulageForm({ service, onClose, onSent }) {
     submittingRef.current = true;
     setSending(true);
     setSendFailed(false);
-    let result = { ok: false };
+    let result;
     try {
       result = await submitHaulageQuote(buildHaulagePayload(values, reference));
     } catch {

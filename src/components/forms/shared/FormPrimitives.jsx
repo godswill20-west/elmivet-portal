@@ -447,7 +447,9 @@ export function Field({ field, formId, values, setValue, errors, files, setFiles
 export function ModalShell({ onClose, titleId, children }) {
   const panelRef = useRef(null);
   const closeRef = useRef(onClose);
+  useEffect(() => {
   closeRef.current = onClose;
+  });
 
   useEffect(() => {
     const previous = document.activeElement;
@@ -586,7 +588,7 @@ export const NEW_INVESTOR_MESSAGE =
 
 /* Set this to the real server endpoint that receives the enquiry. While it is empty the
    form refuses to claim success and shows an error instead. */
-export const OFFSHORE_ENQUIRY_ENDPOINT = "";
+export const OFFSHORE_ENQUIRY_ENDPOINT = "/api/submit-quote";
 
 const ack = (name, label) => ({ name, label, type: "ack", required: true, showIf: NEW_ONLY });
 
@@ -847,7 +849,9 @@ export function OffshoreInvestmentModal({ service, onClose }) {
     setErrors((prev) => {
       if (name === "investorType") return {}; // a different journey: old messages no longer apply
       if (!prev[name] && !prev[`${name}_other`]) return prev;
-      const { [name]: _a, [`${name}_other`]: _b, ...rest } = prev;
+      const rest = { ...prev };
+      delete rest[name];
+      delete rest[`${name}_other`];
       return rest;
     });
   };
@@ -917,7 +921,7 @@ export function OffshoreInvestmentModal({ service, onClose }) {
     submittingRef.current = true;
     setSending(true);
     setSendFailed(false);
-    let result = { ok: false };
+    let result;
     try {
       result = await submitOffshoreEnquiry(buildOffshorePayload(fields, values, reference));
     } finally {

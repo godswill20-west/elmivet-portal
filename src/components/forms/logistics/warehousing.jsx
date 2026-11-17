@@ -55,7 +55,7 @@ const WAREHOUSING_SUBMIT_LABEL = "Submit Storage Request";
 const WAREHOUSING_SUBJECT_PREFIX = "[New Warehousing Request] \u2013 ";
 
 /* Set to the real server endpoint when it exists. While empty, the form refuses to claim success. */
-const WAREHOUSING_SUBMIT_ENDPOINT = "";
+const WAREHOUSING_SUBMIT_ENDPOINT = "/api/submit-quote";
 
 const WAREHOUSING_CLIENT_TYPE_OPTIONS = [
   { code: "import_export_storage", label: "Import/Export Storage" },
@@ -365,7 +365,7 @@ export default function WarehousingForm({ service, onClose, onSent }) {
     submittingRef.current = true;
     setSending(true);
     setSendFailed(false);
-    let result = { ok: false };
+    let result;
     try {
       result = await submitWarehousingQuote(buildWarehousingPayload(values, reference));
     } catch {

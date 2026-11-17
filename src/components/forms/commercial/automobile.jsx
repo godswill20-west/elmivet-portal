@@ -48,7 +48,7 @@ const AUTOMOBILE_SUBMIT_LABEL = "Submit Vehicle Request";
 const AUTOMOBILE_SUBJECT_PREFIX = "[New Automobile Request] \u2013 ";
 
 /* Set to the real server endpoint when it exists. While empty, the form refuses to claim success. */
-const AUTOMOBILE_SUBMIT_ENDPOINT = "";
+const AUTOMOBILE_SUBMIT_ENDPOINT = "/api/submit-quote";
 
 const AUTOMOBILE_MAX_FILES = 5;
 const AUTOMOBILE_MAX_TOTAL_BYTES = 25 * 1024 * 1024;

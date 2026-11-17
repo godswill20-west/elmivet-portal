@@ -48,7 +48,7 @@ const REALESTATE_SUBMIT_LABEL = "Submit Project Request";
 const REALESTATE_SUBJECT_PREFIX = "[New Real Estate Request] \u2013 ";
 
 /* Set to the real server endpoint when it exists. While empty, the form refuses to claim success. */
-const REALESTATE_SUBMIT_ENDPOINT = "";
+const REALESTATE_SUBMIT_ENDPOINT = "/api/submit-quote";
 
 const REALESTATE_ALLOWED_EXT = ["pdf", "jpg", "jpeg", "png"];
 const MB = 1024 * 1024;

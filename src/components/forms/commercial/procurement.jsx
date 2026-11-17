@@ -47,7 +47,7 @@ const PROCUREMENT_MAX_FILE_BYTES = 10 * 1024 * 1024; // 10MB
 
 /* Set this to the real server endpoint when it exists. While it is empty the form refuses to
    claim success and shows an error instead. */
-const PROCUREMENT_SUBMIT_ENDPOINT = "";
+const PROCUREMENT_SUBMIT_ENDPOINT = "/api/submit-quote";
 
 const PROCUREMENT_CLIENT_TYPES = [
   { code: "individual", label: "Individual" },
