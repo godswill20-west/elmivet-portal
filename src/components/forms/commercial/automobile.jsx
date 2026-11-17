@@ -229,9 +229,9 @@ function buildAutomobilePayload(values, attachments, reference, submittedAt = ne
     answers[fd.name] = entry;
   });
   const customer = {
-    clientName: answers.clientName.value,
-    phone: answers.phone.value,
-    email: answers.email.value,
+  contactName: answers.clientName.value,
+  phone: answers.phone.value,
+  email: answers.email.value,
   };
   const purpose = AUTOMOBILE_PURPOSE_OPTIONS.find((o) => o.label === values.servicePurpose);
   return {
