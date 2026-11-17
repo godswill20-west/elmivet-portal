@@ -9,6 +9,7 @@ import {
   WIDE_TYPES,
   SUBMIT_CLICK_GUARD_MS,
 } from "../shared/FormPrimitives";
+import { uploadQuoteFiles, fileSetSignature } from "../shared/quoteFileUpload";
 
 const QUOTES_TO = "quotes@elmivet.com";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -49,6 +50,7 @@ const AUTOMOBILE_SUBJECT_PREFIX = "[New Automobile Request] \u2013 ";
 
 /* Set to the real server endpoint when it exists. While empty, the form refuses to claim success. */
 const AUTOMOBILE_SUBMIT_ENDPOINT = "/api/submit-quote";
+const AUTOMOBILE_UPLOAD_FAILED_MESSAGE = "We could not upload your files. Please try again.";
 
 const AUTOMOBILE_MAX_FILES = 5;
 const AUTOMOBILE_MAX_TOTAL_BYTES = 25 * 1024 * 1024;
@@ -205,7 +207,7 @@ function validateAutomobile(fields, values, files) {
 /* Builds the payload from the VISIBLE answers only. Every key is always present.
    asked: false -> not shown; value: null -> shown but left blank (optional fields).
    Checkbox answers are sent as arrays (value and code). */
-function buildAutomobilePayload(values, files, reference, submittedAt = new Date().toISOString()) {
+function buildAutomobilePayload(values, attachments, reference, submittedAt = new Date().toISOString()) {
   const visible = new Set(automobileVisibleFields(values).map((fd) => fd.name));
   const answers = {};
   AUTOMOBILE_ALL_FIELDS.forEach((fd) => {
@@ -244,8 +246,8 @@ function buildAutomobilePayload(values, files, reference, submittedAt = new Date
     branch: purpose ? purpose.code : null,
     customer,
     answers,
-    // File metadata only. Replace with uploaded-object entries when the upload-URL workflow is connected.
-    attachments: files.map((f) => ({ name: f.name, size: f.size, type: f.type })),
+    // Uploaded-object entries only: { path, name, size, type }. `path` is the exact Storage path.
+    attachments: attachments.map((a) => ({ path: a.path, name: a.name, size: a.size, type: a.type })),
   };
 }
 
@@ -287,12 +289,14 @@ export default function AutomobileForm({ service, onClose, onSent }) {
   const submittingRef = useRef(false); // blocks double-clicks before state updates land
   const submitArmedAt = useRef(0); // clicks on Submit before this time are ignored (SUBMIT_CLICK_GUARD_MS)
   const referenceRef = useRef(null); // one reference per form, reused on retry so the server can spot duplicates
+  const uploadedRef = useRef(null); // { reference, signature, attachments }: files already in Storage for this reference
   const [values, setValues] = useState({});
   const [files, setFilesState] = useState([]);
   const [errors, setErrors] = useState({});
   const [step, setStep] = useState(0);
   const [sending, setSending] = useState(false);
   const [sendFailed, setSendFailed] = useState(false);
+  const [sendFailMessage, setSendFailMessage] = useState(null); // set only when the upload step failed
 
   const steps = AUTOMOBILE_STEPS;
   const lastStep = steps.length - 1;
@@ -313,6 +317,7 @@ export default function AutomobileForm({ service, onClose, onSent }) {
   const setFiles = (nextFiles) => {
     const resolved = typeof nextFiles === "function" ? nextFiles(files) : nextFiles;
     setFilesState(Array.from(resolved || []));
+    uploadedRef.current = null; // the selection changed: earlier uploads can no longer be reused
     setSendFailed(false);
     setErrors((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => k !== "documents")));
   };
@@ -394,9 +399,41 @@ export default function AutomobileForm({ service, onClose, onSent }) {
     submittingRef.current = true;
     setSending(true);
     setSendFailed(false);
+    setSendFailMessage(null);
+
+    // 1) Upload the real files first. If this fails the quote is NOT submitted and no Thank You is shown.
+    let attachments = [];
+    if (files.length > 0) {
+      const signature = fileSetSignature(files);
+      if (
+        uploadedRef.current &&
+        uploadedRef.current.reference === reference &&
+        uploadedRef.current.signature === signature
+      ) {
+        attachments = uploadedRef.current.attachments; // unchanged files already uploaded: reuse on retry
+      } else {
+        try {
+          attachments = await uploadQuoteFiles({
+            reference,
+            formNumber: AUTOMOBILE_FORM_NUMBER,
+            files,
+          });
+          uploadedRef.current = { reference, signature, attachments };
+        } catch (err) {
+          uploadedRef.current = null;
+          submittingRef.current = false;
+          setSending(false);
+          setSendFailMessage((err && err.userMessage) || AUTOMOBILE_UPLOAD_FAILED_MESSAGE);
+          setSendFailed(true);
+          return;
+        }
+      }
+    }
+
+    // 2) Submit the quote with the uploaded storage paths, using the same reference as the upload.
     let result;
     try {
-      result = await submitAutomobileQuote(buildAutomobilePayload(values, files, reference));
+      result = await submitAutomobileQuote(buildAutomobilePayload(values, attachments, reference));
     } catch {
       result = { ok: false };
     }
@@ -500,8 +537,9 @@ export default function AutomobileForm({ service, onClose, onSent }) {
             className="mt-6 border-l-4 border-[#D9232D] bg-red-50 px-4 py-3 font-sans text-sm text-[#D9232D]"
           >
             <p>
-              We could not send your request just now. Your answers are still here, so you can try again. If this
-              keeps happening, please call one of our hotlines:
+              {sendFailMessage ? `${sendFailMessage} ` : "We could not send your request just now. "}
+              Your answers are still here, so you can try again. If this keeps happening, please call one of our
+              hotlines:
             </p>
             <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-semibold">
               {HOTLINES.map((h) => (
