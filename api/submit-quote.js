@@ -17,6 +17,9 @@ const CLAIM_STALE_SECONDS = 120; // longer than the function's maxDuration
 const MAX_CUSTOMER_EMAIL_ATTEMPTS = 3;
 const MAX_ANSWERS_CHARS = 100000;
 const MAX_ATTACHMENTS = 5;
+const ATTACHMENT_BUCKET = 'elmivet-quotes';
+const ATTACHMENT_PATH_PREFIX = 'uploads/';
+const ATTACHMENT_LINK_TTL_SECONDS = 7 * 24 * 60 * 60; // signed download links last 7 days
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const OFFSHORE_ACK_KEYS = ['confirmPassport', 'confirmPrivacy', 'confirmContact'];
@@ -29,7 +32,7 @@ const SERVICE_NAMES = {
 
 const ROW_COLUMNS =
   'id, reference, form_number, division, service_name, investor_type, payload_hash, status, ' +
-  'customer_name, customer_email, customer_phone, company, answers, acknowledgements, attachments, ' +
+  'customer_name, customer_email, customer_phone, company, answers, acknowledgements, attachments, upload_folder, ' +
   'customer_email_status, customer_email_attempts';
 
 /* ------------------------------------------------------------------ */
@@ -316,7 +319,111 @@ function answerRows(answers) {
   return rows;
 }
 
-function buildInternalEmail(rec) {
+// Backslashes and control characters (C0 range + DEL) are never valid in an attachment path.
+// eslint-disable-next-line no-control-regex
+const UNSAFE_PATH_CHARS_RE = /[\\\u0000-\u001F\u007F]/;
+
+// The path must live inside this submission's own folder: `uploads/<upload_folder>/<filename>`.
+function isValidAttachmentPath(path, uploadFolder) {
+  if (typeof path !== 'string') return false;
+  if (typeof uploadFolder !== 'string' || !uploadFolder || uploadFolder.includes('/')) return false;
+  const prefix = `${ATTACHMENT_PATH_PREFIX}${uploadFolder}/`;
+  return (
+    path.startsWith(prefix) &&
+    path.length > prefix.length &&
+    !path.includes('..') &&
+    !UNSAFE_PATH_CHARS_RE.test(path)
+  );
+}
+
+function formatFileSize(bytes) {
+  if (!Number.isFinite(bytes) || bytes < 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/* Fallback entry (no link). Must never throw: it is used from catch blocks. */
+function attachmentFallbackLink(a, i) {
+  try {
+    const item = isPlainObject(a) ? a : {};
+    const path = typeof item.path === 'string' ? oneLine(item.path) : '';
+    return {
+      name: oneLine(cleanStr(item.name, 200)) || oneLine(path.split('/').pop()) || `Attachment ${i + 1}`,
+      path,
+      size: item.size,
+      url: null,
+    };
+  } catch {
+    return { name: `Attachment ${i + 1}`, path: '', size: undefined, url: null };
+  }
+}
+
+/* Never throws. Used when the whole link-generation step fails unexpectedly. */
+function attachmentFallbackLinks(attachments) {
+  const out = [];
+  try {
+    if (Array.isArray(attachments)) {
+      for (let i = 0; i < attachments.length; i += 1) out.push(attachmentFallbackLink(attachments[i], i));
+    }
+  } catch {
+    /* keep whatever was collected so far */
+  }
+  return out;
+}
+
+async function buildAttachmentLink(supabase, a, i, uploadFolder) {
+  const link = attachmentFallbackLink(a, i);
+  const rawPath = isPlainObject(a) ? a.path : undefined;
+
+  if (!isValidAttachmentPath(rawPath, uploadFolder)) {
+    console.error(`[submit-quote] attachment ${i + 1}: invalid storage path, no link generated`);
+    return link;
+  }
+
+  try {
+    const { data, error } = await supabase.storage
+      .from(ATTACHMENT_BUCKET)
+      .createSignedUrl(rawPath, ATTACHMENT_LINK_TTL_SECONDS);
+    if (error) throw error;
+    const url = data && data.signedUrl;
+    if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) {
+      throw new Error('no usable signed URL returned');
+    }
+    link.url = url;
+  } catch (err) {
+    console.error(`[submit-quote] attachment ${i + 1}: signed URL generation failed:`, errMsg(err));
+  }
+  return link;
+}
+
+/*
+ * Best effort: never throws. Returns one entry per stored attachment with a temporary signed
+ * download URL, or url = null when no link could be generated (the email then shows the storage
+ * path instead). Each attachment is isolated, and an unexpected failure anywhere falls back to
+ * link-less entries so the internal notification is still sent. Signed URLs (which carry a token)
+ * are never logged.
+ */
+async function buildAttachmentLinks(supabase, attachments, uploadFolder) {
+  try {
+    if (!Array.isArray(attachments)) return [];
+    return await Promise.all(
+      attachments.map(async (a, i) => {
+        try {
+          return await buildAttachmentLink(supabase, a, i, uploadFolder);
+        } catch (err) {
+          console.error(`[submit-quote] attachment ${i + 1}: unexpected link error:`, errMsg(err));
+          return attachmentFallbackLink(a, i);
+        }
+      })
+    );
+  } catch (err) {
+    console.error('[submit-quote] attachment link generation failed:', errMsg(err));
+    return attachmentFallbackLinks(attachments);
+  }
+}
+
+function buildInternalEmail(rec, attachmentLinks) {
   const rows = [
     ['Reference', rec.reference],
     ['Form', `#${rec.form_number} — ${rec.service_name}`],
@@ -331,7 +438,21 @@ function buildInternalEmail(rec) {
   const acks = Array.isArray(rec.acknowledgements)
     ? rec.acknowledgements.map((a) => [a.statement, a.accepted ? 'Accepted' : 'Not accepted'])
     : [];
-  const files = Array.isArray(rec.attachments) ? rec.attachments.map((a) => a.path) : [];
+  const files = Array.isArray(attachmentLinks) ? attachmentLinks : [];
+  const ttlDays = ATTACHMENT_LINK_TTL_SECONDS / 86400;
+  const sizeLabel = (f) => {
+    const size = formatFileSize(f.size);
+    return size ? ` (${size})` : '';
+  };
+  const fileHtml = (f) =>
+    f.url
+      ? `<li><a href="${escapeHtml(f.url)}">${escapeHtml(f.name)}</a>${escapeHtml(sizeLabel(f))}</li>`
+      : `<li>${escapeHtml(f.name)}${escapeHtml(sizeLabel(f))} &mdash; download link unavailable. ` +
+        `Storage path: ${escapeHtml(f.path || '—')}</li>`;
+  const fileLine = (f) =>
+    f.url
+      ? `- ${f.name}${sizeLabel(f)}: ${f.url}`
+      : `- ${f.name}${sizeLabel(f)} — download link unavailable. Storage path: ${f.path || '—'}`;
 
   const tr = ([k, v]) =>
     `<tr><td style="padding:4px 12px 4px 0;vertical-align:top"><strong>${escapeHtml(k)}</strong></td>` +
@@ -344,9 +465,11 @@ function buildInternalEmail(rec) {
     `<h3 style="font-family:Arial,sans-serif">Answers</h3>${table(answers)}` +
     (acks.length ? `<h3 style="font-family:Arial,sans-serif">Acknowledgements</h3>${table(acks)}` : '') +
     (files.length
-      ? `<h3 style="font-family:Arial,sans-serif">Attachments (storage paths)</h3><ul>${files
-          .map((p) => `<li>${escapeHtml(p)}</li>`)
-          .join('')}</ul>`
+      ? `<h3 style="font-family:Arial,sans-serif">Attachments</h3>` +
+        (files.some((f) => f.url)
+          ? `<p style="font-family:Arial,sans-serif;font-size:12px;color:#666">Download links expire in ${ttlDays} days.</p>`
+          : '') +
+        `<ul style="font-family:Arial,sans-serif;font-size:14px">${files.map(fileHtml).join('')}</ul>`
       : '');
 
   const line = ([k, v]) => `${k}: ${v}`;
@@ -357,7 +480,13 @@ function buildInternalEmail(rec) {
     'Answers',
     ...answers.map(line),
     ...(acks.length ? ['', 'Acknowledgements', ...acks.map(line)] : []),
-    ...(files.length ? ['', 'Attachments (storage paths)', ...files] : []),
+    ...(files.length
+      ? [
+          '',
+          files.some((f) => f.url) ? `Attachments (download links expire in ${ttlDays} days)` : 'Attachments',
+          ...files.map(fileLine),
+        ]
+      : []),
   ].join('\n');
 
   return {
@@ -601,7 +730,8 @@ export default async function handler(req, res) {
 
     let internalError = null;
     try {
-      const mail = buildInternalEmail(rec);
+      const attachmentLinks = await buildAttachmentLinks(supabase, rec.attachments, rec.upload_folder);
+      const mail = buildInternalEmail(rec, attachmentLinks);
       await getTransporter().sendMail({
         from: `"Elmivet Web Portal" <${FROM_ADDRESS}>`,
         to: INTERNAL_TO,
