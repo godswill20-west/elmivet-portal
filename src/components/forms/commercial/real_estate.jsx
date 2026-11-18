@@ -204,7 +204,7 @@ function buildRealEstatePayload(values, files, reference, submittedAt = new Date
     answers[fd.name] = entry;
   });
   const customer = {
-    clientName: answers.clientName.value,
+    contactName: answers.clientName.value,
     phone: answers.phone.value,
     email: answers.email.value,
   };

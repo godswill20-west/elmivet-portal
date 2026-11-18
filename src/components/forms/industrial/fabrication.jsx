@@ -127,7 +127,7 @@ function buildFabricationPayload(values, reference, files = [], submittedAt = ne
     answers[fd.name] = entry;
   });
   const customer = {
-    clientName: answers.clientName.value,
+    contactName: answers.clientName.value,
     representativeName: answers.representativeName.value,
     phone: answers.phone.value,
     email: answers.email.value,

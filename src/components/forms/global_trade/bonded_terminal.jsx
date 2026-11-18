@@ -149,7 +149,7 @@ function buildBondedPayload(values, files, reference, submittedAt = new Date().t
     answers[fd.name] = entry;
   });
   const customer = {
-    consigneeName: answers.consigneeName.value,
+    contactName: answers.consigneeName.value,
     phone: answers.phone.value,
     email: answers.email.value,
   };

@@ -191,7 +191,7 @@ function buildCustomsPayload(values, files, reference, submittedAt = new Date().
     answers[fd.name] = entry;
   });
   const customer = {
-    importerName: answers.importerName.value,
+    contactName: answers.importerName.value,
     phone: answers.phone.value,
     email: answers.email.value,
   };

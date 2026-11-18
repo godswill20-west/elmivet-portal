@@ -201,7 +201,7 @@ function buildOilPayload(values, reference, filesByField = {}, submittedAt = new
     answers[fd.name] = entry;
   });
   const customer = {
-    clientName: answers.clientName.value,
+    contactName: answers.clientName.value,
     representativeName: answers.representativeName.value,
     phone: answers.phone.value,
     email: answers.email.value,

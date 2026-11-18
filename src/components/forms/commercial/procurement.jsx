@@ -168,7 +168,7 @@ function buildProcurementPayload(values, reference, files = [], submittedAt = ne
     answers[fd.name] = entry;
   });
   const customer = {
-    clientName: answers.clientName.value,
+    contactName: answers.clientName.value,
     email: answers.email.value,
     phone: answers.phone.value,
     clientType: answers.clientType.value,
