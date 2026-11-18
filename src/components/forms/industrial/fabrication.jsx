@@ -8,6 +8,7 @@ import {
   WIDE_TYPES,
   SUBMIT_CLICK_GUARD_MS,
 } from "../shared/FormPrimitives";
+import { uploadQuoteFiles, fileSetSignature } from "../shared/quoteFileUpload";
 
 const QUOTES_TO = "quotes@elmivet.com";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -39,6 +40,10 @@ const FABRICATION_SUBJECT_PREFIX = "[New Fabrication & Construction Lead] \u2013
 /* Set this to the real server endpoint when it exists. While it is empty the form refuses to
    claim success and shows an error instead. */
 const FABRICATION_SUBMIT_ENDPOINT = "/api/submit-quote";
+const FABRICATION_UPLOAD_FAILED_MESSAGE = "We could not upload your files. Please try again.";
+
+const FABRICATION_MAX_FILES = 5;
+const FABRICATION_MAX_TOTAL_BYTES = 25 * 1024 * 1024;
 
 const FABRICATION_CATEGORY_OPTIONS = [
   { code: "structural_steel_fabrication", label: "Structural Steel Fabrication" },
@@ -81,7 +86,15 @@ const FABRICATION_STEPS = [
     title: "Scope & Drawings",
     fields: [
       area("engineeringScope", "Detailed Scope of Engineering Work", { required: false }),
-      { name: "upload", label: "Upload Architectural drawings / BEME sheets", type: "file", required: false },
+      {
+        name: "upload",
+        label: "Upload Architectural drawings / BEME sheets",
+        type: "file",
+        required: false,
+        multiple: true,
+        maxFiles: FABRICATION_MAX_FILES,
+        maxTotalMB: 25,
+      },
     ],
   },
 ];
@@ -92,12 +105,17 @@ const fabricationVisibleFields = (values) =>
   FABRICATION_STEPS.flatMap((st) => st.fields).filter((fd) => isVisible(fd, values));
 
 /* Only visible fields are checked, so a hidden field can never block submission.
-   The upload is optional and the specification sets no size limit, so it is not validated here. */
-function validateFabrication(fields, values) {
+   The upload is optional; when files are chosen they are checked against the 5-file / 25MB limits. */
+function validateFabrication(fields, values, files = []) {
   const errors = {};
   fields.forEach((fd) => {
     if (!isVisible(fd, values)) return;
-    if (fd.type === "file") return;
+    if (fd.type === "file") {
+      const total = files.reduce((sum, f) => sum + (f.size || 0), 0);
+      if (files.length > FABRICATION_MAX_FILES) errors[fd.name] = "You can upload a maximum of 5 files.";
+      else if (total > FABRICATION_MAX_TOTAL_BYTES) errors[fd.name] = "Files must total 25MB or less.";
+      return;
+    }
     const raw = values[fd.name];
     const v = typeof raw === "string" ? raw.trim() : "";
     const isChoice = fd.type === "radio" || fd.type === "select";
@@ -115,7 +133,7 @@ function validateFabrication(fields, values) {
 /* Builds the payload from the VISIBLE answers only. Every key is always present:
      asked: false -> the question was not shown (value is null)
      value: null  -> shown but left blank (optional fields) */
-function buildFabricationPayload(values, reference, files = [], submittedAt = new Date().toISOString()) {
+function buildFabricationPayload(values, attachments, reference, submittedAt = new Date().toISOString()) {
   const visible = new Set(fabricationVisibleFields(values).map((fd) => fd.name));
   const answers = {};
   FABRICATION_ALL_FIELDS.forEach((fd) => {
@@ -145,8 +163,8 @@ function buildFabricationPayload(values, reference, files = [], submittedAt = ne
     branch: null,
     customer,
     answers,
-    // File metadata only. Add uploaded-file URLs here when the upload-URL workflow is connected.
-    attachments: files.map((f) => ({ name: f.name, size: f.size, type: f.type })),
+    // Uploaded-object entries only: { path, name, size, type }. `path` is the exact Storage path.
+    attachments: attachments.map((a) => ({ path: a.path, name: a.name, size: a.size, type: a.type })),
   };
 }
 
@@ -188,12 +206,14 @@ export default function FabricationForm({ service, onClose, onSent }) {
   const submittingRef = useRef(false); // blocks double-clicks before state updates land
   const submitArmedAt = useRef(0); // time before which a click on Submit is ignored (see SUBMIT_CLICK_GUARD_MS)
   const referenceRef = useRef(null); // one reference per form, reused on retry so the server can spot duplicates
+  const uploadedRef = useRef(null); // { reference, signature, attachments }: files already in Storage for this reference
   const [values, setValues] = useState({});
   const [errors, setErrors] = useState({});
-  const [files, setFiles] = useState([]);
+  const [files, setFilesState] = useState([]);
   const [step, setStep] = useState(0);
   const [sending, setSending] = useState(false);
   const [sendFailed, setSendFailed] = useState(false);
+  const [sendFailMessage, setSendFailMessage] = useState(null); // set only when the upload step failed
 
   const steps = FABRICATION_STEPS;
   const lastStep = steps.length - 1;
@@ -209,6 +229,14 @@ export default function FabricationForm({ service, onClose, onSent }) {
     setErrors((prev) =>
       Object.fromEntries(Object.entries(prev).filter(([k]) => k !== name && stillVisible.has(k)))
     );
+  };
+
+  const setFiles = (nextFiles) => {
+    const resolved = typeof nextFiles === "function" ? nextFiles(files) : nextFiles;
+    setFilesState(Array.from(resolved || []));
+    uploadedRef.current = null; // the selection changed: earlier uploads can no longer be reused
+    setSendFailed(false);
+    setErrors((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => k !== "upload")));
   };
 
   useEffect(() => {
@@ -240,7 +268,7 @@ export default function FabricationForm({ service, onClose, onSent }) {
 
   const handleNext = () => {
     if (isLast || submittingRef.current) return;
-    const found = validateFabrication(steps[current].fields, values);
+    const found = validateFabrication(steps[current].fields, values, files);
     setErrors(found);
     if (Object.keys(found).length > 0) {
       focusFirstError(found);
@@ -265,7 +293,7 @@ export default function FabricationForm({ service, onClose, onSent }) {
     if (submittingRef.current) return;
 
     const honeypot = new FormData(e.currentTarget).get("website");
-    const found = validateFabrication(fabricationVisibleFields(values), values);
+    const found = validateFabrication(fabricationVisibleFields(values), values, files);
     setErrors(found);
     if (Object.keys(found).length > 0) {
       // If an earlier step holds the problem, take the person back to it
@@ -288,9 +316,41 @@ export default function FabricationForm({ service, onClose, onSent }) {
     submittingRef.current = true;
     setSending(true);
     setSendFailed(false);
+    setSendFailMessage(null);
+
+    // 1) Upload the real files first. If this fails the quote is NOT submitted and no Thank You is shown.
+    let attachments = [];
+    if (files.length > 0) {
+      const signature = fileSetSignature(files);
+      if (
+        uploadedRef.current &&
+        uploadedRef.current.reference === reference &&
+        uploadedRef.current.signature === signature
+      ) {
+        attachments = uploadedRef.current.attachments; // unchanged files already uploaded: reuse on retry
+      } else {
+        try {
+          attachments = await uploadQuoteFiles({
+            reference,
+            formNumber: FABRICATION_FORM_NUMBER,
+            files,
+          });
+          uploadedRef.current = { reference, signature, attachments };
+        } catch (err) {
+          uploadedRef.current = null;
+          submittingRef.current = false;
+          setSending(false);
+          setSendFailMessage((err && err.userMessage) || FABRICATION_UPLOAD_FAILED_MESSAGE);
+          setSendFailed(true);
+          return;
+        }
+      }
+    }
+
+    // 2) Submit the quote with the uploaded storage paths, using the same reference as the upload.
     let result;
     try {
-      result = await submitFabricationQuote(buildFabricationPayload(values, reference, files));
+      result = await submitFabricationQuote(buildFabricationPayload(values, attachments, reference));
     } catch {
       result = { ok: false };
     }
@@ -394,8 +454,9 @@ export default function FabricationForm({ service, onClose, onSent }) {
             className="mt-6 border-l-4 border-[#D9232D] bg-red-50 px-4 py-3 font-sans text-sm text-[#D9232D]"
           >
             <p>
-              We could not send your request just now. Your answers are still here, so you can try again. If this
-              keeps happening, please call one of our hotlines:
+              {sendFailMessage ? `${sendFailMessage} ` : "We could not send your request just now. "}
+              Your answers are still here, so you can try again. If this keeps happening, please call one of our
+              hotlines:
             </p>
             <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-semibold">
               {HOTLINES.map((h) => (

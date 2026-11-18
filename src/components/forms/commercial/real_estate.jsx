@@ -9,6 +9,7 @@ import {
   WIDE_TYPES,
   SUBMIT_CLICK_GUARD_MS,
 } from "../shared/FormPrimitives";
+import { uploadQuoteFiles, fileSetSignature } from "../shared/quoteFileUpload";
 
 const QUOTES_TO = "quotes@elmivet.com";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -52,6 +53,10 @@ const REALESTATE_SUBMIT_ENDPOINT = "/api/submit-quote";
 
 const REALESTATE_ALLOWED_EXT = ["pdf", "jpg", "jpeg", "png"];
 const MB = 1024 * 1024;
+/* Whole-submission caps across ALL upload fields (the per-field limits below still apply too). */
+const REALESTATE_MAX_TOTAL_FILES = 5;
+const REALESTATE_MAX_TOTAL_BYTES = 25 * MB;
+const REALESTATE_UPLOAD_FAILED_MESSAGE = "We could not upload your files. Please try again.";
 
 const REALESTATE_BROKER = { code: "mandate_broker_facilitator", label: "Authorized Mandate, Broker or Facilitator" };
 const REALESTATE_CLIENT_TYPE_OPTIONS = [
@@ -161,6 +166,11 @@ const realEstateVisibleFields = (values) =>
    `files` is { [fieldName]: File[] }; each file field has its own count, size and type limits. */
 function validateRealEstate(fields, values, files) {
   const errors = {};
+  // Whole-submission caps: counted over every VISIBLE upload field, reported on the last one (it sits
+  // on the final step, where Submit is).
+  const visibleFileFields = realEstateVisibleFields(values).filter((f) => f.type === "file");
+  const allVisibleFiles = visibleFileFields.flatMap((f) => files[f.name] || []);
+  const lastFileFieldName = visibleFileFields.length ? visibleFileFields[visibleFileFields.length - 1].name : null;
   fields.forEach((fd) => {
     if (!isVisible(fd, values)) return;
     if (fd.type === "file") {
@@ -172,6 +182,10 @@ function validateRealEstate(fields, values, files) {
       else if (list.length > fd.maxFiles) errors[fd.name] = `You can upload a maximum of ${fd.maxFiles} file${fd.maxFiles > 1 ? "s" : ""}.`;
       else if (badType) errors[fd.name] = "Only PDF or image files (JPG, PNG) are accepted.";
       else if (list.some((f) => (f.size || 0) > fd.maxFileMB * MB)) errors[fd.name] = `Each file must be ${fd.maxFileMB}MB or less.`;
+      else if (fd.name === lastFileFieldName && allVisibleFiles.length > REALESTATE_MAX_TOTAL_FILES)
+        errors[fd.name] = `You can upload a maximum of ${REALESTATE_MAX_TOTAL_FILES} files in total across all upload fields.`;
+      else if (fd.name === lastFileFieldName && allVisibleFiles.reduce((sum, f) => sum + (f.size || 0), 0) > REALESTATE_MAX_TOTAL_BYTES)
+        errors[fd.name] = "All uploaded files must total 25MB or less.";
       return;
     }
     const raw = values[fd.name];
@@ -188,10 +202,18 @@ function validateRealEstate(fields, values, files) {
   return errors;
 }
 
+/* The files that will be uploaded and sent, in a fixed order: [{ field, file }].
+   Files of a hidden upload field are never included. */
+const realEstateUploadList = (values, files) =>
+  realEstateVisibleFields(values)
+    .filter((fd) => fd.type === "file")
+    .flatMap((fd) => (files[fd.name] || []).map((file) => ({ field: fd.name, file })));
+
 /* Builds the payload from the VISIBLE answers only. Every key is always present.
    asked: false -> not shown; value: null -> shown but left blank (optional fields).
-   Files of a hidden upload field are never listed. */
-function buildRealEstatePayload(values, files, reference, submittedAt = new Date().toISOString()) {
+   `attachments` are the uploaded-object entries ({ field, path, name, size, type }); files of a hidden
+   upload field are never listed. */
+function buildRealEstatePayload(values, attachments, reference, submittedAt = new Date().toISOString()) {
   const visibleFields = realEstateVisibleFields(values);
   const visible = new Set(visibleFields.map((fd) => fd.name));
   const answers = {};
@@ -209,12 +231,6 @@ function buildRealEstatePayload(values, files, reference, submittedAt = new Date
     email: answers.email.value,
   };
   const clientType = REALESTATE_CLIENT_TYPE_OPTIONS.find((o) => o.label === values.clientType);
-  // File metadata only. Replace with uploaded-object entries when the upload-URL workflow is connected.
-  const attachments = visibleFields
-    .filter((fd) => fd.type === "file")
-    .flatMap((fd) =>
-      (files[fd.name] || []).map((f) => ({ field: fd.name, name: f.name, size: f.size, type: f.type }))
-    );
   return {
     form: { id: REALESTATE_FORM_ID, number: REALESTATE_FORM_NUMBER },
     reference,
@@ -227,7 +243,8 @@ function buildRealEstatePayload(values, files, reference, submittedAt = new Date
     branch: clientType ? clientType.code : null,
     customer,
     answers,
-    attachments,
+    // Uploaded-object entries only. `path` is the exact Storage path returned by the upload.
+    attachments: attachments.map((a) => ({ field: a.field, path: a.path, name: a.name, size: a.size, type: a.type })),
   };
 }
 
@@ -269,12 +286,14 @@ export default function RealEstateForm({ service, onClose, onSent }) {
   const submittingRef = useRef(false); // blocks double-clicks before state updates land
   const submitArmedAt = useRef(0); // clicks on Submit before this time are ignored (SUBMIT_CLICK_GUARD_MS)
   const referenceRef = useRef(null); // one reference per form, reused on retry so the server can spot duplicates
+  const uploadedRef = useRef(null); // { reference, signature, uploaded }: files already in Storage for this reference
   const [values, setValues] = useState({});
   const [files, setFilesState] = useState({}); // { [fieldName]: File[] }
   const [errors, setErrors] = useState({});
   const [step, setStep] = useState(0);
   const [sending, setSending] = useState(false);
   const [sendFailed, setSendFailed] = useState(false);
+  const [sendFailMessage, setSendFailMessage] = useState(null); // set only when the upload step failed
 
   const steps = REALESTATE_STEPS;
   const lastStep = steps.length - 1;
@@ -297,6 +316,7 @@ export default function RealEstateForm({ service, onClose, onSent }) {
       const resolved = typeof nextFiles === "function" ? nextFiles(prev[name] || []) : nextFiles;
       return { ...prev, [name]: Array.from(resolved || []) };
     });
+    uploadedRef.current = null; // the selection changed: earlier uploads can no longer be reused
     setSendFailed(false);
     setErrors((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => k !== name)));
   };
@@ -378,9 +398,47 @@ export default function RealEstateForm({ service, onClose, onSent }) {
     submittingRef.current = true;
     setSending(true);
     setSendFailed(false);
+    setSendFailMessage(null);
+
+    // 1) Upload the real files first (visible upload fields only). If this fails the quote is NOT
+    //    submitted and no Thank You is shown.
+    const uploadList = realEstateUploadList(values, files);
+    let attachments = [];
+    if (uploadList.length > 0) {
+      const selected = uploadList.map((x) => x.file);
+      const signature = fileSetSignature(selected);
+      let uploaded;
+      if (
+        uploadedRef.current &&
+        uploadedRef.current.reference === reference &&
+        uploadedRef.current.signature === signature
+      ) {
+        uploaded = uploadedRef.current.uploaded; // unchanged files already uploaded: reuse on retry
+      } else {
+        try {
+          uploaded = await uploadQuoteFiles({
+            reference,
+            formNumber: REALESTATE_FORM_NUMBER,
+            files: selected,
+          });
+          uploadedRef.current = { reference, signature, uploaded };
+        } catch (err) {
+          uploadedRef.current = null;
+          submittingRef.current = false;
+          setSending(false);
+          setSendFailMessage((err && err.userMessage) || REALESTATE_UPLOAD_FAILED_MESSAGE);
+          setSendFailed(true);
+          return;
+        }
+      }
+      // The helper returns results in the same order as `selected`: tag each with its upload field.
+      attachments = uploaded.map((a, i) => ({ ...a, field: uploadList[i].field }));
+    }
+
+    // 2) Submit the quote with the uploaded storage paths, using the same reference as the upload.
     let result;
     try {
-      result = await submitRealEstateQuote(buildRealEstatePayload(values, files, reference));
+      result = await submitRealEstateQuote(buildRealEstatePayload(values, attachments, reference));
     } catch {
       result = { ok: false };
     }
@@ -484,8 +542,9 @@ export default function RealEstateForm({ service, onClose, onSent }) {
             className="mt-6 border-l-4 border-[#D9232D] bg-red-50 px-4 py-3 font-sans text-sm text-[#D9232D]"
           >
             <p>
-              We could not send your request just now. Your answers are still here, so you can try again. If this
-              keeps happening, please call one of our hotlines:
+              {sendFailMessage ? `${sendFailMessage} ` : "We could not send your request just now. "}
+              Your answers are still here, so you can try again. If this keeps happening, please call one of our
+              hotlines:
             </p>
             <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-semibold">
               {HOTLINES.map((h) => (

@@ -8,6 +8,7 @@ import {
   WIDE_TYPES,
   SUBMIT_CLICK_GUARD_MS,
 } from "../shared/FormPrimitives";
+import { uploadQuoteFiles, fileSetSignature } from "../shared/quoteFileUpload";
 
 const QUOTES_TO = "quotes@elmivet.com";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -44,6 +45,9 @@ const PROCUREMENT_FORM_NUMBER = 12;
 const PROCUREMENT_SUBMIT_LABEL = "Submit Request";
 const PROCUREMENT_SUBJECT_PREFIX = "[New Procurement Lead] \u2013 ";
 const PROCUREMENT_MAX_FILE_BYTES = 10 * 1024 * 1024; // 10MB
+const PROCUREMENT_MAX_FILES = 5;
+const PROCUREMENT_MAX_TOTAL_BYTES = 25 * 1024 * 1024; // 25MB across all files
+const PROCUREMENT_UPLOAD_FAILED_MESSAGE = "We could not upload your files. Please try again.";
 
 /* Set this to the real server endpoint when it exists. While it is empty the form refuses to
    claim success and shows an error instead. */
@@ -136,6 +140,10 @@ function validateProcurement(fields, values, files = []) {
     if (fd.type === "file") {
       if (files.some((f) => f.size > PROCUREMENT_MAX_FILE_BYTES)) {
         errors[fd.name] = "Each file must be 10MB or smaller.";
+      } else if (files.length > PROCUREMENT_MAX_FILES) {
+        errors[fd.name] = "You can upload a maximum of 5 files.";
+      } else if (files.reduce((sum, f) => sum + (f.size || 0), 0) > PROCUREMENT_MAX_TOTAL_BYTES) {
+        errors[fd.name] = "Files must total 25MB or less.";
       }
       return;
     }
@@ -156,7 +164,7 @@ function validateProcurement(fields, values, files = []) {
 /* Builds the payload from the VISIBLE answers only. Every key is always present.
      asked: false -> the question was not shown (value is null)
      value: null  -> shown but left blank (optional fields) */
-function buildProcurementPayload(values, reference, files = [], submittedAt = new Date().toISOString()) {
+function buildProcurementPayload(values, reference, attachments = [], submittedAt = new Date().toISOString()) {
   const visible = new Set(procurementVisibleFields(values).map((fd) => fd.name));
   const answers = {};
   PROCUREMENT_ALL_FIELDS.forEach((fd) => {
@@ -183,8 +191,8 @@ function buildProcurementPayload(values, reference, files = [], submittedAt = ne
     branch: null,
     customer,
     answers,
-    // File metadata only. Add uploaded-file URLs here when the upload-URL workflow is connected.
-    attachments: files.map((f) => ({ name: f.name, size: f.size, type: f.type })),
+    // Uploaded-object entries only: { path, name, size, type }. `path` is the exact Storage path.
+    attachments: attachments.map((a) => ({ path: a.path, name: a.name, size: a.size, type: a.type })),
   };
 }
 
@@ -226,12 +234,14 @@ export default function ProcurementForm({ service, onClose, onSent }) {
   const submittingRef = useRef(false); // blocks double-clicks before state updates land
   const submitArmedAt = useRef(0); // time before which a click on Submit is ignored (see SUBMIT_CLICK_GUARD_MS)
   const referenceRef = useRef(null); // one reference per form, reused on retry so the server can spot duplicates
+  const uploadedRef = useRef(null); // { reference, signature, attachments }: files already in Storage for this reference
   const [values, setValues] = useState({});
   const [errors, setErrors] = useState({});
   const [files, setFiles] = useState([]);
   const [step, setStep] = useState(0);
   const [sending, setSending] = useState(false);
   const [sendFailed, setSendFailed] = useState(false);
+  const [sendFailMessage, setSendFailMessage] = useState(null); // set only when the upload step failed
 
   const steps = PROCUREMENT_STEPS;
   const lastStep = steps.length - 1;
@@ -250,6 +260,7 @@ export default function ProcurementForm({ service, onClose, onSent }) {
 
   const updateFiles = (next) => {
     setFiles(next);
+    uploadedRef.current = null; // the selection changed: earlier uploads can no longer be reused
     setSendFailed(false);
     setErrors((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => k !== "upload")));
   };
@@ -331,9 +342,41 @@ export default function ProcurementForm({ service, onClose, onSent }) {
     submittingRef.current = true;
     setSending(true);
     setSendFailed(false);
+    setSendFailMessage(null);
+
+    // 1) Upload the real files first. If this fails the quote is NOT submitted and no Thank You is shown.
+    let attachments = [];
+    if (files.length > 0) {
+      const signature = fileSetSignature(files);
+      if (
+        uploadedRef.current &&
+        uploadedRef.current.reference === reference &&
+        uploadedRef.current.signature === signature
+      ) {
+        attachments = uploadedRef.current.attachments; // unchanged files already uploaded: reuse on retry
+      } else {
+        try {
+          attachments = await uploadQuoteFiles({
+            reference,
+            formNumber: PROCUREMENT_FORM_NUMBER,
+            files,
+          });
+          uploadedRef.current = { reference, signature, attachments };
+        } catch (err) {
+          uploadedRef.current = null;
+          submittingRef.current = false;
+          setSending(false);
+          setSendFailMessage((err && err.userMessage) || PROCUREMENT_UPLOAD_FAILED_MESSAGE);
+          setSendFailed(true);
+          return;
+        }
+      }
+    }
+
+    // 2) Submit the quote with the uploaded storage paths, using the same reference as the upload.
     let result;
     try {
-      result = await submitProcurementQuote(buildProcurementPayload(values, reference, files));
+      result = await submitProcurementQuote(buildProcurementPayload(values, reference, attachments));
     } catch {
       result = { ok: false };
     }
@@ -437,8 +480,9 @@ export default function ProcurementForm({ service, onClose, onSent }) {
             className="mt-6 border-l-4 border-[#D9232D] bg-red-50 px-4 py-3 font-sans text-sm text-[#D9232D]"
           >
             <p>
-              We could not send your request just now. Your answers are still here, so you can try again. If this
-              keeps happening, please call one of our hotlines:
+              {sendFailMessage ? `${sendFailMessage} ` : "We could not send your request just now. "}
+              Your answers are still here, so you can try again. If this keeps happening, please call one of our
+              hotlines:
             </p>
             <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-semibold">
               {HOTLINES.map((h) => (

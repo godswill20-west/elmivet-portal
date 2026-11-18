@@ -8,6 +8,7 @@ import {
   WIDE_TYPES,
   SUBMIT_CLICK_GUARD_MS,
 } from "../shared/FormPrimitives";
+import { uploadQuoteFiles, fileSetSignature } from "../shared/quoteFileUpload";
 
 const QUOTES_TO = "quotes@elmivet.com";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -48,6 +49,11 @@ const MB = 1024 * 1024;
 /* Set this to the real server endpoint when it exists. While it is empty the form refuses to
    claim success and shows an error instead. */
 const OIL_SUBMIT_ENDPOINT = "/api/submit-quote";
+const OIL_UPLOAD_FAILED_MESSAGE = "We could not upload your files. Please try again.";
+
+/* Whole-submission caps across ALL upload fields (the per-file limits below still apply too). */
+const OIL_MAX_FILES = 5;
+const OIL_MAX_TOTAL_BYTES = 25 * MB;
 
 const OIL_CLIENT_MANDATE = {
   code: "authorized_mandate_broker_facilitator",
@@ -150,6 +156,11 @@ function oilBranch(values) {
    `filesByField` maps a file field's name to its chosen files. */
 function validateOil(fields, values, filesByField = {}) {
   const errors = {};
+  // Whole-submission caps: counted over every VISIBLE upload field, reported on the last one (it sits
+  // on the final step, where Submit is).
+  const visibleFileFields = oilVisibleFields(values).filter((f) => f.type === "file");
+  const allVisibleFiles = visibleFileFields.flatMap((f) => filesByField[f.name] || []);
+  const lastFileFieldName = visibleFileFields.length ? visibleFileFields[visibleFileFields.length - 1].name : null;
   fields.forEach((fd) => {
     if (!isVisible(fd, values)) return;
     if (fd.type === "file") {
@@ -158,6 +169,12 @@ function validateOil(fields, values, filesByField = {}) {
         if (fd.required) errors[fd.name] = "Please attach a file.";
       } else if (list.some((f) => f.size > fd.maxBytes)) {
         errors[fd.name] = `Each file must be ${Math.round(fd.maxBytes / MB)}MB or smaller.`;
+      }
+      if (!errors[fd.name] && fd.name === lastFileFieldName) {
+        if (allVisibleFiles.length > OIL_MAX_FILES)
+          errors[fd.name] = `You can upload a maximum of ${OIL_MAX_FILES} files in total across all upload fields.`;
+        else if (allVisibleFiles.reduce((sum, f) => sum + (f.size || 0), 0) > OIL_MAX_TOTAL_BYTES)
+          errors[fd.name] = "All uploaded files must total 25MB or less.";
       }
       return;
     }
@@ -175,26 +192,24 @@ function validateOil(fields, values, filesByField = {}) {
   return errors;
 }
 
+/* The files that will be uploaded and sent, in a fixed order: [{ field, file }].
+   Files of a hidden upload field are never included. */
+const oilUploadList = (values, filesByField) =>
+  oilVisibleFields(values)
+    .filter((fd) => fd.type === "file")
+    .flatMap((fd) => (filesByField[fd.name] || []).map((file) => ({ field: fd.name, file })));
+
 /* Builds the payload from the VISIBLE answers only. Values typed into a field that is now hidden
    stay in the form (so they come back if the person changes their mind) but are never sent.
    Every key is always present, so each branch produces the same shape:
      asked: false -> the question was not shown on this route (value is null)
      value: null  -> shown but left blank (optional fields) */
-function buildOilPayload(values, reference, filesByField = {}, submittedAt = new Date().toISOString()) {
+function buildOilPayload(values, attachments, reference, submittedAt = new Date().toISOString()) {
   const visible = new Set(oilVisibleFields(values).map((fd) => fd.name));
   const answers = {};
-  const attachments = [];
   OIL_ALL_FIELDS.forEach((fd) => {
     const asked = visible.has(fd.name);
-    if (fd.type === "file") {
-      // File metadata only. Add uploaded-file URLs here when the upload-URL workflow is connected.
-      if (asked) {
-        (filesByField[fd.name] || []).forEach((f) =>
-          attachments.push({ field: fd.name, name: f.name, size: f.size, type: f.type })
-        );
-      }
-      return;
-    }
+    if (fd.type === "file") return; // files travel in `attachments`
     const raw = asked ? String(values[fd.name] ?? "").trim() : "";
     const entry = { label: fd.label, asked, value: raw || null };
     if (fd.codes) entry.code = raw ? fd.codes.find((o) => o.label === raw)?.code ?? null : null;
@@ -219,7 +234,8 @@ function buildOilPayload(values, reference, filesByField = {}, submittedAt = new
     branch: oilBranch(values),
     customer,
     answers,
-    attachments,
+    // Uploaded-object entries only. `path` is the exact Storage path returned by the upload.
+    attachments: attachments.map((a) => ({ field: a.field, path: a.path, name: a.name, size: a.size, type: a.type })),
   };
 }
 
@@ -261,12 +277,14 @@ export default function OilServicingForm({ service, onClose, onSent }) {
   const submittingRef = useRef(false); // blocks double-clicks before state updates land
   const submitArmedAt = useRef(0); // time before which a click on Submit is ignored (see SUBMIT_CLICK_GUARD_MS)
   const referenceRef = useRef(null); // one reference per form, reused on retry so the server can spot duplicates
+  const uploadedRef = useRef(null); // { reference, signature, uploaded }: files already in Storage for this reference
   const [values, setValues] = useState({});
   const [errors, setErrors] = useState({});
   const [filesByField, setFilesByField] = useState({}); // one file list per upload field
   const [step, setStep] = useState(0);
   const [sending, setSending] = useState(false);
   const [sendFailed, setSendFailed] = useState(false);
+  const [sendFailMessage, setSendFailMessage] = useState(null); // set only when the upload step failed
 
   const steps = OIL_STEPS;
   const lastStep = steps.length - 1;
@@ -287,6 +305,7 @@ export default function OilServicingForm({ service, onClose, onSent }) {
   /* Each upload field gets its own list; the shared Field is handed that list and a setter for it only. */
   const setFieldFiles = (name, next) => {
     setFilesByField((prev) => ({ ...prev, [name]: typeof next === "function" ? next(prev[name] || []) : next }));
+    uploadedRef.current = null; // the selection changed: earlier uploads can no longer be reused
     setSendFailed(false);
     setErrors((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => k !== name)));
   };
@@ -368,9 +387,47 @@ export default function OilServicingForm({ service, onClose, onSent }) {
     submittingRef.current = true;
     setSending(true);
     setSendFailed(false);
+    setSendFailMessage(null);
+
+    // 1) Upload the real files first (visible upload fields only). If this fails the quote is NOT
+    //    submitted and no Thank You is shown.
+    const uploadList = oilUploadList(values, filesByField);
+    let attachments = [];
+    if (uploadList.length > 0) {
+      const selected = uploadList.map((x) => x.file);
+      const signature = fileSetSignature(selected);
+      let uploaded;
+      if (
+        uploadedRef.current &&
+        uploadedRef.current.reference === reference &&
+        uploadedRef.current.signature === signature
+      ) {
+        uploaded = uploadedRef.current.uploaded; // unchanged files already uploaded: reuse on retry
+      } else {
+        try {
+          uploaded = await uploadQuoteFiles({
+            reference,
+            formNumber: OIL_FORM_NUMBER,
+            files: selected,
+          });
+          uploadedRef.current = { reference, signature, uploaded };
+        } catch (err) {
+          uploadedRef.current = null;
+          submittingRef.current = false;
+          setSending(false);
+          setSendFailMessage((err && err.userMessage) || OIL_UPLOAD_FAILED_MESSAGE);
+          setSendFailed(true);
+          return;
+        }
+      }
+      // The helper returns results in the same order as `selected`: tag each with its upload field.
+      attachments = uploaded.map((a, i) => ({ ...a, field: uploadList[i].field }));
+    }
+
+    // 2) Submit the quote with the uploaded storage paths, using the same reference as the upload.
     let result;
     try {
-      result = await submitOilQuote(buildOilPayload(values, reference, filesByField));
+      result = await submitOilQuote(buildOilPayload(values, attachments, reference));
     } catch {
       result = { ok: false };
     }
@@ -474,8 +531,9 @@ export default function OilServicingForm({ service, onClose, onSent }) {
             className="mt-6 border-l-4 border-[#D9232D] bg-red-50 px-4 py-3 font-sans text-sm text-[#D9232D]"
           >
             <p>
-              We could not send your request just now. Your answers are still here, so you can try again. If this
-              keeps happening, please call one of our hotlines:
+              {sendFailMessage ? `${sendFailMessage} ` : "We could not send your request just now. "}
+              Your answers are still here, so you can try again. If this keeps happening, please call one of our
+              hotlines:
             </p>
             <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-semibold">
               {HOTLINES.map((h) => (
