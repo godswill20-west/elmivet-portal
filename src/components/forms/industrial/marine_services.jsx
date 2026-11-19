@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { X, ShieldCheck, ArrowRight, ArrowLeft } from "lucide-react";
 import { ModalShell, Field, FadeIn, HOTLINES, WIDE_TYPES, SUBMIT_CLICK_GUARD_MS } from "../shared/FormPrimitives";
+import { uploadQuoteFiles, fileSetSignature } from "../shared/quoteFileUpload";
 
 const QUOTES_TO = "quotes@elmivet.com";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -41,6 +42,7 @@ const MARINE_MAX_FILE_BYTES = 5 * 1024 * 1024; // 5MB
 /* Set this to the real server endpoint when it exists. While it is empty the form refuses to
    claim success and shows an error instead. */
 const ENDPOINT = "/api/submit-quote";
+const MARINE_UPLOAD_FAILED_MESSAGE = "We could not upload your files. Please try again.";
 
 const MARINE_CLIENT_TYPE_OPTIONS = [
   { code: "shipowner_fleet_manager", label: "Shipowner / Fleet Manager" },
@@ -163,7 +165,7 @@ function validateMarine(fields, values, files = []) {
 /* Builds the payload from the VISIBLE answers only. Every key is always present:
      asked: false -> the question was not shown on this route (value is null)
      value: null  -> shown but left blank (optional fields) */
-function buildMarinePayload(values, files, reference, submittedAt = new Date().toISOString()) {
+function buildMarinePayload(values, files, reference, uploaded = [], submittedAt = new Date().toISOString()) {
   const visible = new Set(marineVisibleFields(values).map((fd) => fd.name));
   const answers = {};
   MARINE_ALL_FIELDS.forEach((fd) => {
@@ -193,10 +195,8 @@ function buildMarinePayload(values, files, reference, submittedAt = new Date().t
     branch: values.clientType === MARINE_CLIENT_MANDATE.label ? MARINE_CLIENT_MANDATE.code : null,
     customer,
     answers,
-    // File metadata only: the actual upload goes through the upload-URL workflow once it is connected.
-    attachments: mandateAsked
-      ? files.map((f) => ({ field: "mandateUpload", name: f.name, size: f.size, type: f.type }))
-      : [],
+    // Uploaded-object entries only: { path, name, size, type }. `path` is the exact Storage path.
+    attachments: mandateAsked ? uploaded.map((a) => ({ path: a.path, name: a.name, size: a.size, type: a.type })) : [],
   };
 }
 
@@ -238,12 +238,14 @@ export default function MarineServicesForm({ service, onClose, onSent }) {
   const submittingRef = useRef(false); // blocks double-clicks before state updates land
   const submitArmedAt = useRef(0); // time before which a click on Submit is ignored (see SUBMIT_CLICK_GUARD_MS)
   const referenceRef = useRef(null); // one reference per form, reused on retry so the server can spot duplicates
+  const uploadedRef = useRef(null); // { reference, signature, attachments }: files already in Storage for this reference
   const [values, setValues] = useState({});
   const [files, setFiles] = useState([]);
   const [errors, setErrors] = useState({});
   const [step, setStep] = useState(0);
   const [sending, setSending] = useState(false);
   const [sendFailed, setSendFailed] = useState(false);
+  const [sendFailMessage, setSendFailMessage] = useState(null); // set only when the upload step failed
 
   const steps = MARINE_STEPS;
   const lastStep = steps.length - 1;
@@ -263,6 +265,7 @@ export default function MarineServicesForm({ service, onClose, onSent }) {
 
   const handleSetFiles = (next) => {
     setFiles(next);
+    uploadedRef.current = null; // the selection changed: earlier uploads can no longer be reused
     setSendFailed(false);
     setErrors((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => k !== "mandateUpload")));
   };
@@ -344,9 +347,38 @@ export default function MarineServicesForm({ service, onClose, onSent }) {
     submittingRef.current = true;
     setSending(true);
     setSendFailed(false);
+    setSendFailMessage(null);
+
+    // 1) Upload the real mandate file(s) first (only when that question is shown). If this fails the quote
+    //    is NOT submitted and no Thank You is shown.
+    let uploaded = [];
+    if (marineVisibleFields(values).some((fd) => fd.name === "mandateUpload") && files.length > 0) {
+      const signature = fileSetSignature(files);
+      if (
+        uploadedRef.current &&
+        uploadedRef.current.reference === reference &&
+        uploadedRef.current.signature === signature
+      ) {
+        uploaded = uploadedRef.current.attachments; // unchanged files already uploaded: reuse on retry
+      } else {
+        try {
+          uploaded = await uploadQuoteFiles({ reference, formNumber: MARINE_FORM_NUMBER, files });
+          uploadedRef.current = { reference, signature, attachments: uploaded };
+        } catch (err) {
+          uploadedRef.current = null;
+          submittingRef.current = false;
+          setSending(false);
+          setSendFailMessage((err && err.userMessage) || MARINE_UPLOAD_FAILED_MESSAGE);
+          setSendFailed(true);
+          return;
+        }
+      }
+    }
+
+    // 2) Submit the quote with the uploaded storage paths, using the same reference as the upload.
     let result;
     try {
-      result = await submitMarineQuote(buildMarinePayload(values, files, reference));
+      result = await submitMarineQuote(buildMarinePayload(values, files, reference, uploaded));
     } catch {
       result = { ok: false };
     }
@@ -450,8 +482,9 @@ export default function MarineServicesForm({ service, onClose, onSent }) {
             className="mt-6 border-l-4 border-[#D9232D] bg-red-50 px-4 py-3 font-sans text-sm text-[#D9232D]"
           >
             <p>
-              We could not send your request just now. Your answers are still here, so you can try again. If this
-              keeps happening, please call one of our hotlines:
+              {sendFailMessage ? `${sendFailMessage} ` : "We could not send your request just now. "}
+              Your answers are still here, so you can try again. If this keeps happening, please call one of our
+              hotlines:
             </p>
             <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-semibold">
               {HOTLINES.map((h) => (

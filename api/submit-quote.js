@@ -171,9 +171,15 @@ function normalizePayload(body) {
     customer.contactName,
     customer.fullName,
     customer.name,
+    customer.clientName,
     body.customerName,
     findByLabel(answers, /^Full Legal Name/i),
-    customer.companyName
+    customer.companyName,
+    // Last-resort fallbacks, only reached when every name above is empty (previously a 400).
+    customer.representativeName,
+    customer.contactPerson,
+    customer.managerName,
+    customer.email
   );
   if (!customerName) return { error: 'A contact name is required.' };
 
