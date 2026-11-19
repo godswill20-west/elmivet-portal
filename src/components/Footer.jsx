@@ -119,6 +119,16 @@ export default function Footer() {
             <li><NavLink to="/services" className="hover:text-[#D9232D] transition-colors">Services & Global Freight</NavLink></li>
             <li><NavLink to="/Contact#hubs" className="hover:text-[#D9232D] transition-colors">China Office & Bonded Hubs</NavLink></li>
           </ul>
+          <div>
+              <a 
+                href="/privacy_policy.pdf" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="cursor-pointer hover:text-[#D9232D] transition-colors"
+              >
+                Privacy Policy
+              </a>
+            </div>
         </div>
 
         {/* Our Divisions Hub */}
@@ -351,7 +361,14 @@ export default function Footer() {
           <div className="flex flex-wrap items-center justify-center gap-6 font-sans">
             <span className="hover:text-slate-200 cursor-pointer transition-colors">Bonded Terminal Compliance</span>
             <span className="hover:text-slate-200 cursor-pointer transition-colors">Customs Brokerage Terms</span>
-            <span className="hover:text-slate-200 cursor-pointer transition-colors">Privacy Policy</span>
+            <a 
+              href="/privacy_policy.pdf" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="hover:text-slate-200 cursor-pointer transition-colors"
+            >
+              Privacy Policy
+            </a>
           </div>
         </div>
       </div>
