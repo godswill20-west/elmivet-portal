@@ -1,14 +1,17 @@
-import React, { useEffect } from 'react';
+
+import React, { useEffect, Suspense, lazy } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 
-// 5 Page Components
+// Keep Home as a normal import for immediate initial loading
 import Home from './pages/Home';
-import About from './pages/About';                   // Page 2: China Office Hub
-import Services from './pages/Services';             // Page 3: Services & Global Logistics
-import GlobalInsight from './pages/GlobalInsight';   // Page 4: Global Insight and News Hub
-import Contact from './pages/Contact';               // Page 5: Contact & Support Hub
+
+// Lazy-load secondary pages
+const About = lazy(() => import('./pages/About'));
+const Services = lazy(() => import('./pages/Services'));
+const GlobalInsight = lazy(() => import('./pages/GlobalInsight'));
+const Contact = lazy(() => import('./pages/Contact'));
 
 function ScrollToHash() {
   const { pathname, hash } = useLocation();
@@ -22,6 +25,7 @@ function ScrollToHash() {
           element.scrollIntoView({ behavior: 'smooth' });
         }
       }, 100);
+
       return () => clearTimeout(timer);
     }
 
@@ -41,13 +45,21 @@ export default function App() {
 
       {/* Dynamic Page Content Rendered Here Based on URL */}
       <main className="flex-grow">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/About" element={<About />} />
-          <Route path="/Services" element={<Services />} />
-          <Route path="/GlobalInsight" element={<GlobalInsight />} />
-          <Route path="/contact" element={<Contact />} />
-        </Routes>
+        <Suspense
+          fallback={
+            <div className="min-h-[50vh] flex items-center justify-center">
+              Loading...
+            </div>
+          }
+        >
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/About" element={<About />} />
+            <Route path="/Services" element={<Services />} />
+            <Route path="/GlobalInsight" element={<GlobalInsight />} />
+            <Route path="/contact" element={<Contact />} />
+          </Routes>
+        </Suspense>
       </main>
 
       {/* Global Footer */}

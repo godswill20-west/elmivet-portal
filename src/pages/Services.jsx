@@ -1,34 +1,37 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, lazy, Suspense } from "react";
 
-// Standalone Form Components — Global Trade (Forms 01–05)
-import ImportExportForm from "../components/forms/global_trade/import";
-import OceanFreightForm from "../components/forms/global_trade/ocean_freight";
-import ClearingCustomsForm from "../components/forms/global_trade/clearing_customs";
-import GroupageLclForm from "../components/forms/global_trade/groupage_lcl";
-import BondedTerminalForm from "../components/forms/global_trade/bonded_terminal";
 
-// Standalone Form Components — Logistics & Supply Chain (Forms 06–09)
-import RoadHaulageForm from "../components/forms/logistics/road_haulage";
-import WarehousingForm from "../components/forms/logistics/warehousing";
-import PackingRemovalForm from "../components/forms/logistics/packing";
-import DomesticBulkHaulageForm from "../components/forms/logistics/domestic";
+// Standalone Form Components — Lazy-loaded on demand
 
-// Standalone Form Components — Commercial Division (Forms 10–12, 20)
-import AutomobileForm from "../components/forms/commercial/automobile";
-import RealEstateForm from "../components/forms/commercial/real_estate";
-import ProcurementForm from "../components/forms/commercial/procurement";
-import OffshoreInvestmentForm from "../components/forms/commercial/offshore_investment";
+// Global Trade (Forms 01–05)
+const ImportExportForm = lazy(() => import("../components/forms/global_trade/import"));
+const OceanFreightForm = lazy(() => import("../components/forms/global_trade/ocean_freight"));
+const ClearingCustomsForm = lazy(() => import("../components/forms/global_trade/clearing_customs"));
+const GroupageLclForm = lazy(() => import("../components/forms/global_trade/groupage_lcl"));
+const BondedTerminalForm = lazy(() => import("../components/forms/global_trade/bonded_terminal"));
 
-// Standalone Form Components — Industrial Division (Forms 13–18)
-import CleaningForm from "../components/forms/industrial/cleaning";
-import EnergyForm from "../components/forms/industrial/energy";
-import PetroleumForm from "../components/forms/industrial/petroleum";
-import FabricationForm from "../components/forms/industrial/fabrication";
-import OilServicingForm from "../components/forms/logistics/oil_servicing";
-import MarineServicesForm from "../components/forms/industrial/marine_services";
+// Logistics & Supply Chain (Forms 06–09)
+const RoadHaulageForm = lazy(() => import("../components/forms/logistics/road_haulage"));
+const WarehousingForm = lazy(() => import("../components/forms/logistics/warehousing"));
+const PackingRemovalForm = lazy(() => import("../components/forms/logistics/packing"));
+const DomesticBulkHaulageForm = lazy(() => import("../components/forms/logistics/domestic"));
 
-// Standalone Form Components — China Operations (Form 19)
-import ChinaQuoteForm from "../components/forms/china/china_quote";
+// Commercial Division (Forms 10–12, 20)
+const AutomobileForm = lazy(() => import("../components/forms/commercial/automobile"));
+const RealEstateForm = lazy(() => import("../components/forms/commercial/real_estate"));
+const ProcurementForm = lazy(() => import("../components/forms/commercial/procurement"));
+const OffshoreInvestmentForm = lazy(() => import("../components/forms/commercial/offshore_investment"));
+
+// Industrial Division (Forms 13–18)
+const CleaningForm = lazy(() => import("../components/forms/industrial/cleaning"));
+const EnergyForm = lazy(() => import("../components/forms/industrial/energy"));
+const PetroleumForm = lazy(() => import("../components/forms/industrial/petroleum"));
+const FabricationForm = lazy(() => import("../components/forms/industrial/fabrication"));
+const OilServicingForm = lazy(() => import("../components/forms/logistics/oil_servicing"));
+const MarineServicesForm = lazy(() => import("../components/forms/industrial/marine_services"));
+
+// China Operations (Form 19)
+const ChinaQuoteForm = lazy(() => import("../components/forms/china/china_quote"));
 
 // Shared Primitives & Approved Confirmation Interfaces
 import {
@@ -36,6 +39,7 @@ import {
   OffshoreThanksModal,
   ImagePlaceholder,
 } from "../components/forms/shared/FormPrimitives";
+
 
 import {
   Globe,
@@ -553,18 +557,42 @@ export default function Services() {
       <ChinaSection onOpen={(service) => setModal({ mode: "form", service })} />
 
       {/* ---------------- Modals ---------------- */}
+      
       {modal?.mode === "form" && (() => {
         const FormComponent = CUSTOM_FORMS[modal.service.num];
         if (!FormComponent) return null;
+
         return (
-          <FormComponent
-            key={modal.service.num}
-            service={modal.service}
-            onClose={closeModal}
-            onSent={({ reference, registered }) =>
-              setModal({ mode: "thanks", service: modal.service, reference, registered })
+          <Suspense
+            fallback={
+              <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60">
+                <div
+                  className="bg-white px-8 py-6 text-center shadow-xl"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-[#0A2540]" />
+                  <p className="font-sans text-sm font-medium text-[#0A2540]">
+                    Loading quote form...
+                  </p>
+                </div>
+              </div>
             }
-          />
+          >
+            <FormComponent
+              key={modal.service.num}
+              service={modal.service}
+              onClose={closeModal}
+              onSent={({ reference, registered }) =>
+                setModal({
+                  mode: "thanks",
+                  service: modal.service,
+                  reference,
+                  registered,
+                })
+              }
+            />
+          </Suspense>
         );
       })()}
 

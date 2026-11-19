@@ -307,7 +307,7 @@ export default function About() {
       {/* ---------------- 3. Core values ---------------- */}
       <section
         aria-labelledby="values-heading"
-        className="border-y border-slate-200 bg-white"
+        className="border-y border-slate-200 bg-slate-100"
       >
         <div className="container section-padding">
           <Reveal>
