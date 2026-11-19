@@ -321,8 +321,8 @@ export default function About() {
                 delay={i * 90}
                 className={`h-full ${i === 4 ? "sm:col-span-2 xl:col-span-1" : ""}`}
               >
-                <article className="flex h-full flex-col border border-slate-200 bg-slate-50 p-6">
-                  <h3 className="font-serif text-lg font-bold leading-snug text-[#0A2540]">
+                <article className="flex h-full flex-col border border-white bg-[#0A2540] p-6">
+                  <h3 className="font-serif text-lg font-bold leading-snug text-white">
                     {v.title}
                   </h3>
                   <div className="mt-4 flex flex-wrap gap-2">
@@ -330,7 +330,7 @@ export default function About() {
                       <Chip key={t}>{t}</Chip>
                     ))}
                   </div>
-                  <p className="mt-4 font-sans text-sm leading-relaxed text-slate-600">
+                  <p className="mt-4 font-sans text-sm leading-relaxed text-white">
                     {v.text}
                   </p>
                 </article>

@@ -125,7 +125,9 @@ export interface OrganogramPlan {
  */
 export function planOrganogram(info: OrganogramInfo, uuid: string): OrganogramPlan {
   return {
-    documentId: `organogram.${uuid}`,
+    // No dot in the id: Sanity only lets unauthenticated readers (the public website) read documents
+    // whose _id has no dot, so a dotted id would hide the organogram from the site.
+    documentId: uuid,
     versionNumber: info.nextVersion,
     status: info.publishedCount === 0 ? ORGANOGRAM_STATUS.current : ORGANOGRAM_STATUS.archived,
   }

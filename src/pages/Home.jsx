@@ -46,20 +46,28 @@ const MARKETS = [
   'International Markets',
 ];
 
+// Returns the note only until the cutoff date; after that it returns null.
+// Months are 0-indexed in JS, so 11 = December.
+const PUBLICATION_NOTE_CUTOFF = new Date(2026, 11, 29); // Dec 29, 2026, 00:00 local time
+
+function getPublicationNote(note) {
+  return new Date() < PUBLICATION_NOTE_CUTOFF ? note : null;
+}
+
 const TECH = [
   {
     icon: MapPin,
     name: 'ElmiveTrack',
     tag: 'License-based',
     text: 'Our exclusive, license-based shipment tracking application providing real-time container visibility and cargo security updates.',
-    publicationNote: null
+    publicationNote: null,
   },
   {
     icon: Cpu,
     name: 'ElmivetHub',
     tag: 'Client portal',
     text: 'A unified digital engagement platform connecting clients, partners and stakeholders with events, business opportunities, corporate updates and interactive experiences.',
-    publicationNote: ' scheduled for publication in December 2026.',
+    publicationNote: getPublicationNote(' scheduled for publication in December 2026.'),
   },
 ];
 
