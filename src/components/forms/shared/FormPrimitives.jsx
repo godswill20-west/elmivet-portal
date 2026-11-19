@@ -488,7 +488,7 @@ export function ModalShell({ onClose, titleId, children }) {
   );
 }
 
-export function ThanksModal({ service, reference, onClose }) {
+export function ThanksModal({ service, elmReference, onClose }) {
   return (
     <ModalShell onClose={onClose} titleId="thanks-title">
       <div className="px-6 py-10 text-center sm:px-12">
@@ -506,7 +506,7 @@ export function ThanksModal({ service, reference, onClose }) {
           been logged. A member of our quotations desk will respond within{" "}
           <strong className="text-[#0A2540]">24 hours</strong>.
         </p>
-        <p className="mt-3 font-mono text-xs text-slate-500">Reference: {reference}</p>
+        {elmReference && <p className="mt-3 font-mono text-xs text-slate-500">Reference: {elmReference}</p>}
 
         <div className="mt-8 border-t border-slate-200 pt-8">
           <p className="flex items-center justify-center gap-2 font-sans text-sm font-semibold text-[#0A2540]">
@@ -538,7 +538,7 @@ export function ThanksModal({ service, reference, onClose }) {
   );
 }
 
-export function OffshoreThanksModal({ service, reference, registered, onClose }) {
+export function OffshoreThanksModal({ service, elmReference, registered, onClose }) {
   return (
     <ModalShell onClose={onClose} titleId="offshore-thanks-title">
       <div className="px-6 py-10 text-center sm:px-12">
@@ -554,7 +554,7 @@ export function OffshoreThanksModal({ service, reference, registered, onClose })
         <p className="mx-auto mt-4 max-w-xl font-sans leading-relaxed text-slate-600">
           {registered ? REGISTERED_MESSAGE : NEW_INVESTOR_MESSAGE}
         </p>
-        {reference && <p className="mt-3 font-mono text-xs text-slate-500">Reference: {reference}</p>}
+        {elmReference && <p className="mt-3 font-mono text-xs text-slate-500">Reference: {elmReference}</p>}
         <button
           type="button"
           onClick={onClose}
@@ -769,7 +769,14 @@ export async function submitOffshoreEnquiry(payload) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    return res.ok ? { ok: true } : { ok: false, reason: `http-${res.status}` };
+    if (!res.ok) return { ok: false, reason: `http-${res.status}` };
+    let data = null;
+    try {
+      data = await res.json();
+    } catch {
+      data = null;
+    }
+    return { ok: true, elmReference: data && typeof data.elmReference === "string" ? data.elmReference.trim() : "" };
   } catch {
     return { ok: false, reason: "network" };
   }
@@ -834,7 +841,7 @@ export function OffshoreInvestmentModal({ service, onClose }) {
   const [step, setStep] = useState(0);
   const [sending, setSending] = useState(false);
   const [sendFailed, setSendFailed] = useState(false);
-  const [done, setDone] = useState(null); // { reference, registered }
+  const [done, setDone] = useState(null); // { elmReference, registered }
 
   const isRegistered = values.investorType === OFFSHORE_REGISTERED;
   // Registered members get a single short step; new investors get all five.
@@ -914,7 +921,7 @@ export function OffshoreInvestmentModal({ service, onClose }) {
 
     const reference = `ELM-${service.num}-${Date.now().toString(36).toUpperCase()}`;
     if (honeypot) {
-      setDone({ reference, registered: isRegistered }); // bots only: nothing is sent
+      setDone({ elmReference: "", registered: isRegistered }); // bots only: nothing is sent, no reference shown
       return;
     }
 
@@ -928,7 +935,7 @@ export function OffshoreInvestmentModal({ service, onClose }) {
       submittingRef.current = false;
       setSending(false);
     }
-    if (result.ok) setDone({ reference, registered: isRegistered });
+    if (result.ok) setDone({ elmReference: result.elmReference, registered: isRegistered });
     else setSendFailed(true);
   };
 
@@ -949,7 +956,9 @@ export function OffshoreInvestmentModal({ service, onClose }) {
           <p className="mx-auto mt-4 max-w-xl font-sans leading-relaxed text-slate-600">
             {done.registered ? REGISTERED_MESSAGE : NEW_INVESTOR_MESSAGE}
           </p>
-          <p className="mt-3 font-mono text-xs text-slate-500">Reference: {done.reference}</p>
+          {done.elmReference && (
+            <p className="mt-3 font-mono text-xs text-slate-500">Reference: {done.elmReference}</p>
+          )}
           <button
             type="button"
             onClick={onClose}

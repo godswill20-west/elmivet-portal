@@ -342,7 +342,9 @@ async function submitOffshoreQuote(payload) {
     }
     const confirmed =
       res.ok && data && typeof data === "object" && !data.error && data.ok !== false && data.success !== false;
-    return confirmed ? { ok: true } : { ok: false, reason: `http-${res.status}` };
+    return confirmed
+      ? { ok: true, elmReference: typeof data.elmReference === "string" ? data.elmReference.trim() : "" }
+      : { ok: false, reason: `http-${res.status}` };
   } catch {
     return { ok: false, reason: "network" };
   }
@@ -535,7 +537,7 @@ export default function OffshoreInvestmentForm({ service, onClose, onSent }) {
       result = { ok: false };
     }
     if (result.ok) {
-      onSent({ reference, registered: values.memberStatus === OFFSHORE_MEMBER_A.label });
+      onSent({ elmReference: result.elmReference, registered: values.memberStatus === OFFSHORE_MEMBER_A.label });
       return;
     }
     submittingRef.current = false;

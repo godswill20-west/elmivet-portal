@@ -2,6 +2,7 @@
 import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
+import { assignConsultationReference } from './_lib/elmReference.js';
 
 export const config = { maxDuration: 30 };
 
@@ -182,9 +183,9 @@ function createTransporter(env) {
   });
 }
 
-function buildInternalEmail(rec) {
+function buildInternalEmail(rec, elmReference) {
   const rows = [
-    ['Reference', rec.reference],
+    ['Reference', elmReference],
     ['Client name', rec.client_name],
     ['Client type', rec.client_type],
     ['Email', rec.email],
@@ -207,34 +208,29 @@ function buildInternalEmail(rec) {
   const text = ['New consultation request', ...rows.map(([k, v]) => `${k}: ${v}`)].join('\n');
 
   return {
-    subject: oneLine(`[Consultation] ${rec.division} – ${rec.client_name} (${rec.reference})`),
+    subject: oneLine(`[Consultation] ${rec.division} – ${rec.client_name} (${elmReference})`),
     html,
     text,
   };
 }
 
-function buildCustomerEmail(rec) {
-  const when = rec.preferred_schedule ? rec.preferred_schedule.replace('T', ' ') : null;
+function buildCustomerEmail(rec, elmReference) {
+  // Inquiry topic: the area of consultation if the client chose one, otherwise the target division.
+  const topic = rec.area || rec.division;
   const html =
     `<p>Dear ${escapeHtml(rec.client_name)},</p>` +
-    `<p>Thank you for booking a consultation with Elmivet International. ` +
-    `Our team has received your request and will contact you using your preferred method ` +
-    `within <strong>24 hours</strong>.</p>` +
-    `<p>Reference: <strong>${escapeHtml(rec.reference)}</strong><br/>` +
-    `Division: ${escapeHtml(rec.division)}<br/>` +
-    `Preferred method: ${escapeHtml(rec.method)}` +
-    (when ? `<br/>Preferred date &amp; time: ${escapeHtml(when)}` : '') +
-    `</p>` +
+    `<p>Thank you for your inquiry regarding ${escapeHtml(topic)}. ` +
+    `Our team has received your inquiry and will review your details and respond within 24 hours.</p>` +
+    `<p>Reference ID: ${escapeHtml(elmReference)}</p>` +
     `<p>Best regards,<br/>Elmivet International Team</p>`;
   const text =
     `Dear ${rec.client_name},\n\n` +
-    `Thank you for booking a consultation with Elmivet International. ` +
-    `Our team has received your request and will contact you using your preferred method within 24 hours.\n\n` +
-    `Reference: ${rec.reference}\nDivision: ${rec.division}\nPreferred method: ${rec.method}\n` +
-    (when ? `Preferred date & time: ${when}\n` : '') +
-    `\nBest regards,\nElmivet International Team`;
+    `Thank you for your inquiry regarding ${topic}. ` +
+    `Our team has received your inquiry and will review your details and respond within 24 hours.\n\n` +
+    `Reference ID: ${elmReference}\n\n` +
+    `Best regards,\nElmivet International Team`;
   return {
-    subject: oneLine('We received your consultation request — Elmivet International'),
+    subject: oneLine(`We’ve received your inquiry Ref ${elmReference}`),
     html,
     text,
   };
@@ -289,7 +285,7 @@ async function currentInternalStatus(supabase, reference) {
 }
 
 /* Best effort: never throws, never affects the HTTP response. One attempt, no automatic retry. */
-async function sendCustomerConfirmation(supabase, getTransporter, rec) {
+async function sendCustomerConfirmation(supabase, getTransporter, rec, elmReference) {
   let claimed = false;
   try {
     const { data, error } = await supabase
@@ -309,7 +305,7 @@ async function sendCustomerConfirmation(supabase, getTransporter, rec) {
 
   let errorText = null;
   try {
-    const mail = buildCustomerEmail(rec);
+    const mail = buildCustomerEmail(rec, elmReference);
     await getTransporter().sendMail({
       from: `"Elmivet International" <${FROM_ADDRESS}>`,
       to: rec.email,
@@ -434,6 +430,10 @@ export default async function handler(req, res) {
       throw insertError;
     }
 
+    // 5b. Official reference: issued by the database, once per stored request (idempotent on retry).
+    //     `rec.reference` is only the browser's idempotency token, never the official ID.
+    const elmReference = await assignConsultationReference(supabase, rec.reference);
+
     // 6. Internal notification: claim -> send -> finish
     const claim = await claimInternalEmail(supabase, rec.reference);
 
@@ -441,15 +441,15 @@ export default async function handler(req, res) {
       // Already sent, or another request is sending it right now.
       const status = await currentInternalStatus(supabase, rec.reference);
       if (status === 'sent') {
-        await sendCustomerConfirmation(supabase, getTransporter, rec);
-        return reply(res, 200, { ok: true, success: true, reference: rec.reference });
+        await sendCustomerConfirmation(supabase, getTransporter, rec, elmReference);
+        return reply(res, 200, { ok: true, success: true, reference: rec.reference, elmReference });
       }
       return fail(res, 409, 'Your request is still being processed. Please try again in a minute.');
     }
 
     let internalError = null;
     try {
-      const mail = buildInternalEmail(claim.rec);
+      const mail = buildInternalEmail(claim.rec, elmReference);
       await getTransporter().sendMail({
         from: `"Elmivet Web Portal" <${FROM_ADDRESS}>`,
         to: INTERNAL_TO,
@@ -483,9 +483,9 @@ export default async function handler(req, res) {
     }
 
     // 7. Customer confirmation (best effort; never blocks success)
-    await sendCustomerConfirmation(supabase, getTransporter, rec);
+    await sendCustomerConfirmation(supabase, getTransporter, rec, elmReference);
 
-    return reply(res, 200, { ok: true, success: true, reference: rec.reference });
+    return reply(res, 200, { ok: true, success: true, reference: rec.reference, elmReference });
   } catch (err) {
     console.error('[submit-consultation] unexpected error:', errMsg(err));
     return fail(res, 500, 'Something went wrong. Please try again.');

@@ -450,7 +450,7 @@ function ChinaSection({ onOpen }) {
    Page
    ========================================================================== */
 export default function Services() {
-  const [modal, setModal] = useState(null); // { mode: 'form' | 'thanks', service, reference?, registered? }
+  const [modal, setModal] = useState(null); // { mode: 'form' | 'thanks', service, elmReference?, registered? }
   const [active, setActive] = useState(NAV_ITEMS[0].id);
 
   /* Highlight the current division in the sticky nav */
@@ -583,11 +583,11 @@ export default function Services() {
               key={modal.service.num}
               service={modal.service}
               onClose={closeModal}
-              onSent={({ reference, registered }) =>
+              onSent={({ elmReference, registered }) =>
                 setModal({
                   mode: "thanks",
                   service: modal.service,
-                  reference,
+                  elmReference,
                   registered,
                 })
               }
@@ -599,7 +599,7 @@ export default function Services() {
       {modal?.mode === "thanks" && modal.service.num === 20 && (
         <OffshoreThanksModal
           service={modal.service}
-          reference={modal.reference}
+          elmReference={modal.elmReference}
           registered={modal.registered}
           onClose={closeModal}
         />
@@ -608,7 +608,7 @@ export default function Services() {
       {modal?.mode === "thanks" && modal.service.num !== 20 && (
         <ThanksModal
           service={modal.service}
-          reference={modal.reference}
+          elmReference={modal.elmReference}
           onClose={closeModal}
         />
       )}

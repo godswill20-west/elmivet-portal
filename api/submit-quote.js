@@ -2,6 +2,7 @@
 import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
+import { assignQuoteReference } from './_lib/elmReference.js';
 
 // Vercel Node function setting. Must stay within your plan's limit.
 export const config = { maxDuration: 30 };
@@ -27,6 +28,31 @@ const OFFSHORE_ACK_KEYS = ['confirmPassport', 'confirmPrivacy', 'confirmContact'
 // Known service names. Any other form falls back to "<division> - Form N".
 const SERVICE_NAMES = {
   1: 'Import and Export Facilitation',
+  20: 'Real Estate Offshore Investment Enquiry',
+};
+
+// Customer-facing inquiry topic per form (titles as shown on the Services page). Used only for the
+// customer confirmation email; it does not affect the stored service_name or the internal email.
+const INQUIRY_TOPICS = {
+  1: 'Import and Export Facilitation',
+  2: 'Ocean and Air Freight Forwarding',
+  3: 'Clearing & Customs Brokerage',
+  4: 'Groupage / LCL Services',
+  5: 'Bonded Terminal Operations',
+  6: 'Road Haulage & Industrial Logistics',
+  7: 'Warehousing & Storage',
+  8: 'Packing & Removal',
+  9: 'Domestic Bulk Haulage',
+  10: 'Automobile Dealership & Importation',
+  11: 'Real Estate & Project Request',
+  12: 'Procurement & Bulk Merchandise',
+  13: 'General Cleaning Services',
+  14: 'Energy Solutions',
+  15: 'Petroleum Marketing',
+  16: 'Fabrication & Construction',
+  17: 'Oil Servicing',
+  18: 'Marine Services',
+  19: 'China Operational & Logistics',
   20: 'Real Estate Offshore Investment Enquiry',
 };
 
@@ -90,7 +116,7 @@ function getDivision(formNumber) {
   if (formNumber >= 6 && formNumber <= 9) return 'Logistics & Supply Chain';
   if (formNumber >= 10 && formNumber <= 12) return 'Commercial';
   if (formNumber >= 13 && formNumber <= 18) return 'Industrial';
-  if (formNumber === 19) return 'Marine Services';
+  if (formNumber === 19) return 'China Operations & Logistics';
   return 'Commercial'; // Form 20
 }
 
@@ -429,9 +455,9 @@ async function buildAttachmentLinks(supabase, attachments, uploadFolder) {
   }
 }
 
-function buildInternalEmail(rec, attachmentLinks) {
+function buildInternalEmail(rec, attachmentLinks, elmReference) {
   const rows = [
-    ['Reference', rec.reference],
+    ['Reference', elmReference],
     ['Form', `#${rec.form_number} — ${rec.service_name}`],
     ['Division', rec.division],
     ...(rec.investor_type ? [['Investor type', rec.investor_type]] : []),
@@ -496,35 +522,35 @@ function buildInternalEmail(rec, attachmentLinks) {
   ].join('\n');
 
   return {
-    subject: oneLine(`[${rec.division}] ${rec.service_name} – ${rec.customer_name} (${rec.reference})`),
+    subject: oneLine(`[${rec.division}] ${rec.service_name} – ${rec.customer_name} (${elmReference})`),
     html,
     text,
   };
 }
 
-function buildCustomerEmail(rec) {
-  const name = escapeHtml(rec.customer_name);
-  const division = escapeHtml(rec.division);
+function buildCustomerEmail(rec, elmReference) {
+  const topic = INQUIRY_TOPICS[rec.form_number] || rec.service_name || rec.division;
   const html =
-    `<p>Dear ${name},</p>` +
-    `<p>Thank you for contacting Elmivet International regarding <strong>${division}</strong>. ` +
-    `Our team has received your submission and will review your details and respond within <strong>24 hours</strong>.</p>` +
-    `<p>Your reference: <strong>${escapeHtml(rec.reference)}</strong></p>` +
+    `<p>Dear ${escapeHtml(rec.customer_name)},</p>` +
+    `<p>Thank you for your inquiry regarding ${escapeHtml(topic)}. ` +
+    `Our team has received your inquiry and will review your details and respond within 24 hours.</p>` +
+    `<p>Reference ID: ${escapeHtml(elmReference)}</p>` +
     `<p>Best regards,<br/>Elmivet International Team</p>`;
   const text =
     `Dear ${rec.customer_name},\n\n` +
-    `Thank you for contacting Elmivet International regarding ${rec.division}. ` +
-    `Our team has received your submission and will review your details and respond within 24 hours.\n\n` +
-    `Your reference: ${rec.reference}\n\nBest regards,\nElmivet International Team`;
+    `Thank you for your inquiry regarding ${topic}. ` +
+    `Our team has received your inquiry and will review your details and respond within 24 hours.\n\n` +
+    `Reference ID: ${elmReference}\n\n` +
+    `Best regards,\nElmivet International Team`;
   return {
-    subject: oneLine(`We received your ${rec.division} inquiry — Elmivet International`),
+    subject: oneLine(`We’ve received your inquiry Ref ${elmReference}`),
     html,
     text,
   };
 }
 
 /* Best effort: never throws, never affects the HTTP response. */
-async function sendCustomerConfirmation(supabase, getTransporter, rec, includeFailed) {
+async function sendCustomerConfirmation(supabase, getTransporter, rec, includeFailed, elmReference) {
   if (!rec.customer_email) return;
   let claim = null;
   try {
@@ -544,7 +570,7 @@ async function sendCustomerConfirmation(supabase, getTransporter, rec, includeFa
   let ok = false;
   let error = null;
   try {
-    const mail = buildCustomerEmail(rec);
+    const mail = buildCustomerEmail(rec, elmReference);
     await getTransporter().sendMail({
       from: `"Elmivet International" <${FROM_ADDRESS}>`,
       to: rec.customer_email,
@@ -667,13 +693,20 @@ export default async function handler(req, res) {
           return fail(res, 409, 'This reference has already been submitted.');
         }
         // Already delivered internally: just make sure the customer confirmation is not lost.
+        const completedElmReference = await assignQuoteReference(supabase, rec.reference, row.form_number);
         await sendCustomerConfirmation(
           supabase,
           getTransporter,
           rec,
-          rec.customer_email_attempts < MAX_CUSTOMER_EMAIL_ATTEMPTS
+          rec.customer_email_attempts < MAX_CUSTOMER_EMAIL_ATTEMPTS,
+          completedElmReference
         );
-        return reply(res, 200, { ok: true, success: true, reference: rec.reference });
+        return reply(res, 200, {
+          ok: true,
+          success: true,
+          reference: rec.reference,
+          elmReference: completedElmReference,
+        });
       }
 
       if (rec.payload_hash !== row.payload_hash) {
@@ -712,6 +745,10 @@ export default async function handler(req, res) {
       }
     }
 
+    // 3b. Official reference: issued by the database, once per stored submission (idempotent on retry).
+    //     `rec.reference` above is only the browser's idempotency token, never the official ID.
+    const elmReference = await assignQuoteReference(supabase, rec.reference, row.form_number);
+
     // 4. Internal email: claim -> send -> finish
     const { data: claimData, error: claimError } = await supabase.rpc('elmivet_quote_claim_internal_email', {
       p_reference: rec.reference,
@@ -729,7 +766,7 @@ export default async function handler(req, res) {
         .maybeSingle();
       if (currentError) throw currentError;
       if (current && current.status === 'completed') {
-        return reply(res, 200, { ok: true, success: true, reference: rec.reference });
+        return reply(res, 200, { ok: true, success: true, reference: rec.reference, elmReference });
       }
       return fail(res, 409, 'Your submission is still being processed. Please try again in a minute.');
     }
@@ -737,7 +774,7 @@ export default async function handler(req, res) {
     let internalError = null;
     try {
       const attachmentLinks = await buildAttachmentLinks(supabase, rec.attachments, rec.upload_folder);
-      const mail = buildInternalEmail(rec, attachmentLinks);
+      const mail = buildInternalEmail(rec, attachmentLinks, elmReference);
       await getTransporter().sendMail({
         from: `"Elmivet Web Portal" <${FROM_ADDRESS}>`,
         to: INTERNAL_TO,
@@ -780,9 +817,9 @@ export default async function handler(req, res) {
     }
 
     // 5. Customer confirmation (best effort; never blocks success)
-    await sendCustomerConfirmation(supabase, getTransporter, rec, false);
+    await sendCustomerConfirmation(supabase, getTransporter, rec, false, elmReference);
 
-    return reply(res, 200, { ok: true, success: true, reference: rec.reference });
+    return reply(res, 200, { ok: true, success: true, reference: rec.reference, elmReference });
   } catch (err) {
     console.error('[submit-quote] unexpected error:', errMsg(err));
     return fail(res, 500, 'Something went wrong. Please try again.');

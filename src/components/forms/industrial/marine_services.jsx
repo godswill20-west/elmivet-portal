@@ -224,7 +224,9 @@ async function submitMarineQuote(payload) {
     }
     const confirmed =
       res.ok && data && typeof data === "object" && !data.error && data.ok !== false && data.success !== false;
-    return confirmed ? { ok: true } : { ok: false, reason: `http-${res.status}` };
+    return confirmed
+      ? { ok: true, elmReference: typeof data.elmReference === "string" ? data.elmReference.trim() : "" }
+      : { ok: false, reason: `http-${res.status}` };
   } catch {
     return { ok: false, reason: "network" };
   }
@@ -383,7 +385,7 @@ export default function MarineServicesForm({ service, onClose, onSent }) {
       result = { ok: false };
     }
     if (result.ok) {
-      onSent({ reference }); // the existing Thank You modal: only after the server confirmed
+      onSent({ elmReference: result.elmReference }); // the existing Thank You modal: only after the server confirmed
       return;
     }
     submittingRef.current = false;

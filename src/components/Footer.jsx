@@ -127,7 +127,7 @@ export default function Footer() {
             Our Divisions
           </h3>
           <ul className="space-y-2.5 text-sm text-slate-300">
-            <li><NavLink to="/Services#global-trade" className="hover:text-[#D9232D] transition-colors">Glbal Trade</NavLink></li>
+            <li><NavLink to="/Services#global-trade" className="hover:text-[#D9232D] transition-colors">Global Trade</NavLink></li>
             <li><NavLink to="/Services#logistics-supply-chain" className="hover:text-[#D9232D] transition-colors">Logistics & Supply Chain</NavLink></li>
             <li><NavLink to="/services#commercial" className="hover:text-[#D9232D] transition-colors">Commercial</NavLink></li>
             <li><NavLink to="/Services#industrial" className="hover:text-[#D9232D] transition-colors">Industrial</NavLink></li>

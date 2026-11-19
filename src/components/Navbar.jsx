@@ -230,7 +230,10 @@ async function submitConsultation(payload) {
       data = null;
     }
 
-    if (response.ok && data && data.success === true) return { ok: true };
+    if (response.ok && data && data.success === true) {
+      // Official reference only: honeypot/fake responses carry none, so none is shown.
+      return { ok: true, elmReference: typeof data.elmReference === 'string' ? data.elmReference.trim() : '' };
+    }
 
     const message =
       data && typeof data.error === 'string' && data.error.trim()
@@ -414,7 +417,7 @@ function ConsultationModal({ onClose }) {
   const [values, setValues] = useState({});
   const [errors, setErrors] = useState({});
   const [sending, setSending] = useState(false);
-  const [reference, setReference] = useState(null);
+  const [thanks, setThanks] = useState(null); // { elmReference } once the Thank You screen is showing
   const [submitError, setSubmitError] = useState('');
   const inFlightRef = useRef(false); // synchronous guard against double submits (state updates are async)
   const attemptRef = useRef(null); // keeps the same reference when retrying an unchanged request
@@ -472,7 +475,7 @@ function ConsultationModal({ onClose }) {
     }
     // Honeypot filled: show the usual screen to the bot, but send nothing
     if (honeypot) {
-      setReference(newConsultReference());
+      setThanks({ elmReference: '' }); // fake submission: no official reference is invented
       return;
     }
 
@@ -504,7 +507,7 @@ function ConsultationModal({ onClose }) {
       const result = await submitConsultation({ reference: ref, ...fields, website: '' });
       if (result.ok) {
         attemptRef.current = null;
-        setReference(ref); // Thank You screen only after the server confirms success
+        setThanks({ elmReference: result.elmReference }); // Thank You screen only after the server confirms success
         return;
       }
       setSubmitError(result.error);
@@ -514,7 +517,7 @@ function ConsultationModal({ onClose }) {
     }
   };
 
-  if (reference) {
+  if (thanks) {
     return (
       <ModalShell onClose={onClose} titleId="consult-thanks-title">
         <div className="px-6 py-10 text-center sm:px-12">
@@ -531,7 +534,9 @@ function ConsultationModal({ onClose }) {
             Your advisory session request has been logged. A member of our team will contact you
             using your preferred method within <strong className="text-[#0A2540]">24 hours</strong>.
           </p>
-          <p className="mt-3 font-mono text-xs text-slate-500">Reference: {reference}</p>
+          {thanks.elmReference && (
+            <p className="mt-3 font-mono text-xs text-slate-500">Reference: {thanks.elmReference}</p>
+          )}
           <button
             type="button"
             onClick={onClose}
