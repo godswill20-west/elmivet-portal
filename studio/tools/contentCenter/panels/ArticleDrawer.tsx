@@ -1,7 +1,8 @@
 import {Button} from '../components/Button'
 import {CoverArt} from '../components/CoverArt'
 import {ArticleStatusBadge, UnpublishedChangesBadge} from '../components/StatusBadge'
-import {FEATURED_TEXT, featuredState} from '../lib/articles'
+import {inHomepage, isInsightFeature} from '../lib/placements'
+import type {PlacementAction, Placements} from '../lib/placements'
 import {Drawer} from '../overlay/Drawer'
 import type {ArticleSummary} from '../lib/types'
 import {availableActions, canPerform, deniedMessage, publishLabel} from '../operations/permissions'
@@ -11,6 +12,9 @@ interface ArticleDrawerProps {
   /** The article to show. Kept after closing so content stays visible during the exit animation. */
   article: ArticleSummary | null
   open: boolean
+  placements: Placements
+  placementsLocked: boolean
+  onPlacement: (action: PlacementAction, article: ArticleSummary) => void
   permissions: ArticlePermissionState
   /** True while any publish, unpublish or delete is running. */
   busy: boolean
@@ -22,6 +26,9 @@ interface ArticleDrawerProps {
 export function ArticleDrawer({
   article,
   open,
+  placements,
+  placementsLocked,
+  onPlacement,
   permissions,
   busy,
   onClose,
@@ -45,6 +52,14 @@ export function ArticleDrawer({
     )
   }
 
+  const home = inHomepage(placements, article.id)
+  const insight = isInsightFeature(placements, article.id)
+  const placementButton = (label: string, action: PlacementAction) => (
+    <Button variant="quiet" disabled={busy || placementsLocked} onClick={() => onPlacement(action, article)}>
+      {label}
+    </Button>
+  )
+
   return (
     <Drawer
       open={open}
@@ -62,6 +77,16 @@ export function ArticleDrawer({
             {actionButton('delete', 'Delete', 'red')}
             {available.publish ? actionButton('publish', publishLabel(article), 'quiet') : null}
             {available.unpublish ? actionButton('unpublish', 'Unpublish', 'quiet') : null}
+            {home
+              ? placementButton('Remove from homepage', 'homeRemove')
+              : article.hasPublished
+                ? placementButton('Feature on homepage', 'homeAdd')
+                : null}
+            {insight
+              ? placementButton('Remove from GlobalInsight', 'insightClear')
+              : article.hasPublished
+                ? placementButton('Feature on GlobalInsight', 'insightSet')
+                : null}
           </div>
           <Button variant="navy" icon="pen" onClick={onEdit}>
             Edit Article
@@ -90,8 +115,12 @@ export function ArticleDrawer({
           <b>{article.publishedLabel}</b>
         </div>
         <div className="ecc-fact">
-          <span>Featured</span>
-          <b>{FEATURED_TEXT[featuredState(article)]}</b>
+          <span>Homepage</span>
+          <b>{home ? 'Featured' : 'Not featured'}</b>
+        </div>
+        <div className="ecc-fact">
+          <span>GlobalInsight page</span>
+          <b>{insight ? 'Featured' : 'Not featured'}</b>
         </div>
         <div className="ecc-fact">
           <span>Read time</span>

@@ -121,11 +121,13 @@ export default defineType({
     }),
     defineField({
       name: 'isFeatured',
-      title: 'Feature on Homepage / Top of Insights',
-      description: 'Toggle ON to pin this dispatch as the lead story.',
+      title: 'Legacy featured flag (no longer used)',
+      description:
+        'Deprecated. It no longer controls any placement. Use Featured Placements in the Content Center.',
       type: 'boolean',
       group: 'meta',
-      initialValue: false,
+      readOnly: true,
+      hidden: true,
     }),
     defineField({
       name: 'readTime',
@@ -166,11 +168,10 @@ export default defineType({
     select: {
       title: 'title',
       category: 'category',
-      isFeatured: 'isFeatured',
       media: 'coverImage',
     },
-    prepare({title, category, isFeatured, media}) {
-      const subtitle = [category, isFeatured ? '★ Lead Story' : ''].filter(Boolean).join(' • ')
+    prepare({title, category, media}) {
+      const subtitle = category || ''
       return {
         title: title || 'Untitled Dispatch',
         subtitle,

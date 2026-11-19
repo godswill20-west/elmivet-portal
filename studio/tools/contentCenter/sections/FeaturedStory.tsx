@@ -43,7 +43,7 @@ export function FeaturedStory({article, loading, unavailable, onOpen}: FeaturedS
           <p>
             {unavailable
               ? 'It appears here once the articles load.'
-              : 'A published article marked as featured appears here as the lead story.'}
+              : 'No article is selected for the GlobalInsight featured position. Choose one under Featured placements below.'}
           </p>
         </div>
       </div>

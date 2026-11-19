@@ -8,13 +8,13 @@ import {ArticleStatusBadge} from '../components/StatusBadge'
 import type {ArticlesStatus} from '../hooks/useArticles'
 import {
   DEFAULT_FILTERS,
-  FEATURED_TEXT,
-  featuredState,
   filterArticles,
   hasActiveFilters,
 } from '../lib/articles'
 import type {ArticleFilters, StatusFilter} from '../lib/articles'
 import {ARTICLE_CATEGORIES} from '../lib/constants'
+import {inHomepage, isInsightFeature, placementLabels} from '../lib/placements'
+import type {PlacementAction, Placements} from '../lib/placements'
 import {stagger} from '../lib/style'
 import type {ArticleSummary} from '../lib/types'
 import {availableActions, canPerform, deniedMessage, publishLabel} from '../operations/permissions'
@@ -45,6 +45,10 @@ const EMPTY_STATUS_COPY: Record<StatusFilter, {title: string; text: string}> = {
 
 interface RecentArticlesProps {
   articles: ArticleSummary[]
+  placements: Placements
+  /** True while selections load or a placement change is running. */
+  placementsLocked: boolean
+  onPlacement: (action: PlacementAction, article: ArticleSummary) => void
   status: ArticlesStatus
   /** Why the first load failed (shown with a retry). */
   error: string | null
@@ -82,6 +86,9 @@ function Skeleton() {
 
 export function RecentArticles({
   articles,
+  placements,
+  placementsLocked,
+  onPlacement,
   status,
   error,
   refreshing,
@@ -118,6 +125,28 @@ export function RecentArticles({
     document.getElementById(`${panelId}-tab-${next.id}`)?.focus()
   }
 
+  const placementItems = (article: ArticleSummary): RowMenuItem[] => {
+    const home = inHomepage(placements, article.id)
+    const insight = isInsightFeature(placements, article.id)
+    const make = (label: string, action: PlacementAction): RowMenuItem => ({
+      label,
+      disabled: placementsLocked || busyId !== null,
+      onSelect: () => onPlacement(action, article),
+    })
+    return [
+      ...(home
+        ? [make('Remove from homepage', 'homeRemove')]
+        : article.hasPublished
+          ? [make('Feature on homepage', 'homeAdd')]
+          : []),
+      ...(insight
+        ? [make('Remove from GlobalInsight', 'insightClear')]
+        : article.hasPublished
+          ? [make('Feature on GlobalInsight', 'insightSet')]
+          : []),
+    ]
+  }
+
   const menuItems = (article: ArticleSummary): RowMenuItem[] => {
     const available = availableActions(article)
     const busy = busyId !== null
@@ -136,6 +165,7 @@ export function RecentArticles({
       {label: 'Edit article', onSelect: () => onEdit(article.id)},
       ...(available.publish ? [item('publish', publishLabel(article))] : []),
       ...(available.unpublish ? [item('unpublish', 'Unpublish')] : []),
+      ...placementItems(article),
       item('delete', 'Delete', true),
     ]
   }
@@ -200,7 +230,7 @@ export function RecentArticles({
               <span className="ecc-row-title">{article.title}</span>
               <span className="ecc-row-cat">
                 {article.categoryLabel}
-                {featuredState(article) !== 'none' ? ` · ${FEATURED_TEXT[featuredState(article)]}` : ''}
+                {placementLabels(article.id, placements).map((label) => ` · Featured: ${label}`).join('')}
                 {article.hasUnpublishedChanges ? ' · Unpublished changes' : ''}
               </span>
             </button>

@@ -3,6 +3,8 @@
 /*  No React, no Sanity client: easy to test and safe to import anywhere.     */
 /* -------------------------------------------------------------------------- */
 
+import { formatLongDate, formatShortDate } from './newsroom.js'
+
 export const FEATURED_MAX = 10
 
 const SLUG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]*$/
@@ -36,6 +38,10 @@ export function normalizeInsight(raw, index = 0) {
     label: cleanString(raw.tag) || category,
     coverImage: HTTP_URL_PATTERN.test(coverImage) ? coverImage : '',
     coverAlt: cleanString(raw.coverAlt),
+    // Publication date straight from Sanity ('' when missing or unparseable)
+    publishedAt: formatShortDate(raw.publishedAt) ? raw.publishedAt : null,
+    date: formatShortDate(raw.publishedAt),
+    longDate: formatLongDate(raw.publishedAt),
   }
 }
 
@@ -66,13 +72,17 @@ export function getLayoutVariant(count) {
 }
 
 /**
- * Link target for a card. Until article pages exist (detailBase = null) every
- * card goes to the Global Insight listing, exactly as the homepage does today.
+ * Link target for a card.
+ *  - detailBase set  -> `${detailBase}/${slug}` (a dedicated article page)
+ *  - queryParam set  -> `${listPath}?${queryParam}=${slug}` (opens the article reader on the
+ *                       Global Insight page)
+ *  - otherwise       -> the Global Insight listing
  * A missing or invalid slug always falls back to the listing.
  */
-export function buildInsightHref(slug, { listPath, detailBase = null }) {
-  if (detailBase && isValidSlug(slug)) {
-    return `${detailBase}/${encodeURIComponent(slug.trim())}`
-  }
+export function buildInsightHref(slug, { listPath, detailBase = null, queryParam = null }) {
+  if (!isValidSlug(slug)) return listPath
+  const clean = encodeURIComponent(slug.trim())
+  if (detailBase) return `${detailBase}/${clean}`
+  if (queryParam) return `${listPath}?${queryParam}=${clean}`
   return listPath
 }

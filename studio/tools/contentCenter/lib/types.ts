@@ -1,3 +1,5 @@
+import type {PortableTextBlock} from '@portabletext/editor'
+
 import type {ArticleCategory} from './constants'
 
 export type ArticleStatus = 'published' | 'draft'
@@ -17,7 +19,43 @@ export interface ArticleCover {
   alt: string
   /** CSS object-position derived from the image hotspot ("50% 50%" when none is set). */
   objectPosition: string
+  /**
+   * The id of the Sanity image asset the cover points at (the `_ref` of `coverImage.asset`, for
+   * example `image-<hash>-1600x900-jpg`), or null when the reference could not be read. Used to
+   * tell which asset a cover uses; it is never needed to display the cover.
+   */
+  assetRef: string | null
 }
+
+/** A reference to a Sanity asset document, exactly as stored in `coverImage.asset`. */
+export interface SanityAssetReference {
+  _type: 'reference'
+  _ref: string
+}
+
+/**
+ * A cover as it is written to a document: a fresh image object with an asset reference and alt
+ * text. It carries no hotspot or crop, so writing one resets both.
+ */
+export interface ArticleCoverImageValue {
+  _type: 'image'
+  asset: SanityAssetReference
+  alt: string
+}
+
+/**
+ * What a save should do with the article's cover. Exactly one of four states:
+ * - `unchanged`: the cover is not touched (no write, no unset).
+ * - `set`: a new or replacement cover; `assetRef` and `alt` are both required.
+ * - `alt`: only the alt text changes; the asset reference, hotspot and crop are kept.
+ * - `remove`: the `coverImage` field is unset. The Sanity asset document is never touched.
+ * Fields that do not belong to a state (for example `alt` on `remove`) are rejected, not ignored.
+ */
+export type ArticleCoverChange =
+  | {kind: 'unchanged'}
+  | {kind: 'set'; assetRef: string; alt: string}
+  | {kind: 'alt'; alt: string}
+  | {kind: 'remove'}
 
 /**
  * One article as the dashboard shows it. A draft and its published counterpart are merged into
@@ -39,10 +77,6 @@ export interface ArticleSummary {
   hasDraft: boolean
   /** A published article that also has a draft with edits that are not live yet. */
   hasUnpublishedChanges: boolean
-  /** The `isFeatured` value of the content being displayed (draft when one exists). */
-  isFeatured: boolean
-  /** The `isFeatured` value of the published document: what the public site would use. */
-  featuredLive: boolean
   /** Short date for lists, e.g. "12 Nov 2026" or "Edited 12 Nov 2026". */
   dateLabel: string
   /** "12 Nov 2026, 09:30" when published, otherwise "Not published". */
@@ -86,4 +120,41 @@ export interface DashboardStats {
   createdThisMonth: number
   /** Articles per month for the last six months, oldest first (drives the sparklines). */
   trend: {total: number[]; published: number[]; drafts: number[]}
+}
+
+/** What the Create Article form collects for a new draft. */
+export interface ArticleDraftInput {
+  headline: string
+  category: ArticleCategory | null
+  /** Optional card label; empty means "show the category instead". */
+  label: string
+  summary: string
+  /**
+   * Portable Text body from the article editor. Optional: a draft may be saved without one, and
+   * an empty or whitespace-only body is treated as no body.
+   */
+  body?: PortableTextBlock[]
+  /**
+   * What to do with the cover image. Optional: leaving it out means `{kind: 'unchanged'}`, so
+   * callers that do not manage covers behave exactly as before.
+   */
+  coverImage?: ArticleCoverChange
+}
+
+/** A new `globalInsight` draft document exactly as it is written to Sanity. */
+export interface ArticleDraftDocument {
+  _id: string
+  _type: 'globalInsight'
+  title: string
+  excerpt: string
+  category: ArticleCategory
+  tag?: string
+  readTime: number
+  author: string
+  publishedAt: string
+  slug: {_type: 'slug'; current: string}
+  /** Present only when the body has meaningful content. */
+  body?: PortableTextBlock[]
+  /** Present only when a cover was explicitly set (`{kind: 'set'}`). */
+  coverImage?: ArticleCoverImageValue
 }

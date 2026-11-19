@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { useCurrentOrganogram } from "../hooks/useElmivetContent";
+import { describeSanityError } from "../lib/sanityConfig";
 
 /* ==========================================================================
    Scroll-triggered reveal using the project's `animate-mouth-opening` class.
@@ -212,7 +214,27 @@ function StatementBlock({ data }) {
 /* ==========================================================================
    Page
    ========================================================================== */
+const formatEffectiveDate = (iso) => {
+  const date = iso ? new Date(iso) : null;
+  if (!date || Number.isNaN(date.getTime())) return "";
+  try {
+    return date.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Lagos" });
+  } catch {
+    return date.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  }
+};
+
+/* Short version line from the Sanity metadata, e.g. "Version 3 - November 2026 · Effective 1 November 2026" */
+function organogramVersionLine(doc) {
+  const version = doc.versionLabel || (doc.versionNumber ? `Version ${doc.versionNumber}` : "");
+  const effective = formatEffectiveDate(doc.effectiveDate);
+  return [version, effective && `Effective ${effective}`].filter(Boolean).join(" · ");
+}
+
 export default function About() {
+  const organogram = useCurrentOrganogram();
+  const organogramError = organogram.error ? describeSanityError(organogram.error) : null;
+  const versionLine = organogram.data ? organogramVersionLine(organogram.data) : "";
   return (
     <main className="bg-slate-50 text-slate-700">
       {/* ---------------- 1. Hero / company overview ---------------- */}
@@ -427,19 +449,67 @@ export default function About() {
 
           </div>
 
-          {/* Premium CTA Button: View Corporate Structure & Governance */}
+          {/* Premium CTA Button: View Corporate Structure & Governance (current organogram from Sanity) */}
           <div className="pt-6 flex flex-col items-center justify-center space-y-4">
-            <a
-              href="/documents/organogram.pdf" 
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center space-x-3 bg-[#0A2540] hover:bg-[#D9232D] text-white px-8 py-4 rounded-sm font-sans text-sm font-bold tracking-wide transition-all duration-300 shadow-md group cursor-pointer"
-            >
-              <span>View Corporate Structure & Governance</span>
-              <svg className="w-4 h-4 transform group-hover:translate-x-1 transition-transform fill-current" viewBox="0 0 24 24">
-                <path d="M5 13h11.586l-5.293 5.293 1.414 1.414L21.414 12l-7.707-7.707-1.414 1.414L16.586 11H5v2z"/>
-              </svg>
-            </a>
+            {organogram.data ? (
+              <>
+              <a
+                href={organogram.data.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`View Corporate Structure & Governance${versionLine ? ` (${versionLine})` : ""} (PDF, opens in a new tab)`}
+                className="inline-flex items-center space-x-3 bg-[#0A2540] hover:bg-[#D9232D] text-white px-8 py-4 rounded-sm font-sans text-sm font-bold tracking-wide transition-all duration-300 shadow-md group cursor-pointer"
+              >
+                <span>View Corporate Structure & Governance</span>
+                <svg className="w-4 h-4 transform group-hover:translate-x-1 transition-transform fill-current" viewBox="0 0 24 24">
+                  <path d="M5 13h11.586l-5.293 5.293 1.414 1.414L21.414 12l-7.707-7.707-1.414 1.414L16.586 11H5v2z"/>
+                </svg>
+              </a>
+              {versionLine && (
+                <p className="text-xs text-slate-500 text-center">Current version: {versionLine}</p>
+              )}
+              </>
+            ) : (
+              <>
+                <span
+                  role="link"
+                  aria-disabled="true"
+                  aria-busy={organogram.loading}
+                  className={`inline-flex items-center space-x-3 bg-slate-300 text-slate-600 px-8 py-4 rounded-sm font-sans text-sm font-bold tracking-wide shadow-md select-none ${
+                    organogram.loading ? "cursor-progress animate-pulse" : "cursor-not-allowed"
+                  }`}
+                >
+                  <span>View Corporate Structure & Governance</span>
+                </span>
+                {organogram.loading && (
+                  <p className="text-xs text-slate-500 text-center max-w-md" role="status">
+                    Loading the current organogram…
+                  </p>
+                )}
+                {!organogram.loading && organogramError && (
+                  <div className="text-xs text-slate-500 text-center max-w-md space-y-1" role="alert">
+                    <p>
+                      The organogram could not be loaded right now.{" "}
+                      <button
+                        type="button"
+                        onClick={organogram.refetch}
+                        className="underline font-semibold text-[#0A2540] hover:text-[#D9232D] cursor-pointer"
+                      >
+                        Try again
+                      </button>
+                    </p>
+                    <p className="break-words text-[0.7rem] text-slate-400">
+                      {organogramError.headline} {organogramError.detail}
+                    </p>
+                  </div>
+                )}
+                {!organogram.loading && !organogramError && (
+                  <p className="text-xs text-slate-500 text-center max-w-md" role="status">
+                    No current organogram has been published yet. Please check back soon.
+                  </p>
+                )}
+              </>
+            )}
           </div>
 
           {/* Elegant Horizontal Divider & Footnote Clause */}

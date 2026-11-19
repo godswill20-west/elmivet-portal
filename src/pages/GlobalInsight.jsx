@@ -1,4 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import useElmivetContent, { imageUrl } from "../hooks/useElmivetContent";
+import { describeSanityError } from "../lib/sanityConfig";
+import { latestPublishedLabel } from "../lib/newsroom";
+import ArticleReader from "../components/ArticleReader";
 
 /* ==========================================================================
    Scroll-triggered reveal: adds `animate-mouth-opening` when the element
@@ -40,9 +45,11 @@ function Reveal({ children, className = "", delay = 0 }) {
 }
 
 /* ==========================================================================
-   Image placeholder: swap for <img> later. Keeps a fixed aspect ratio.
+   Cover image: the real Sanity cover photo (with its alt text). Keeps a fixed
+   aspect ratio. If an article has no usable image, or the image fails to load,
+   the branded gradient is shown instead (no "placeholder" wording).
    ========================================================================== */
-function ImagePlaceholder({ tag, label, className = "aspect-video" }) {
+function CoverArt({ tag, label, className }) {
   return (
     <div
       role="img"
@@ -75,122 +82,60 @@ function ImagePlaceholder({ tag, label, className = "aspect-video" }) {
         <path d="M250 20h8v86h-8zM250 20l70 18v6l-70-12zM320 38v40h-4V38z" />
         <path d="M230 106h170v14H230z" />
       </svg>
-      <span className="absolute left-4 top-4 bg-white/95 px-2.5 py-1 font-sans text-[0.65rem] font-semibold uppercase tracking-widest text-[#0A2540]">
-        {tag}
-      </span>
-      <span className="absolute bottom-3 right-4 font-sans text-[0.65rem] font-medium uppercase tracking-widest text-white/60">
-        Image placeholder
-      </span>
+      <TagPill tag={tag} />
+    </div>
+  );
+}
+
+function TagPill({ tag }) {
+  if (!tag) return null;
+  return (
+    <span className="absolute left-4 top-4 bg-white/95 px-2.5 py-1 font-sans text-[0.65rem] font-semibold uppercase tracking-widest text-[#0A2540]">
+      {tag}
+    </span>
+  );
+}
+
+function CoverImage({ article, className = "aspect-video", sizes, ratio = 0.5625 }) {
+  const [failed, setFailed] = useState(false);
+  const cover = article.cover;
+  const alt = cover?.alt || `Cover image: ${article.title}`;
+
+  if (!cover || failed) {
+    return <CoverArt tag={article.tag} label={alt} className={className} />;
+  }
+
+  const src = (w) => imageUrl(cover.url, { width: w, height: Math.round(w * ratio) });
+  return (
+    <div className={`relative w-full overflow-hidden bg-slate-200 ${className}`}>
+      <img
+        src={src(900)}
+        srcSet={`${src(480)} 480w, ${src(900)} 900w, ${src(1400)} 1400w`}
+        sizes={sizes}
+        alt={alt}
+        loading="lazy"
+        decoding="async"
+        onError={() => setFailed(true)}
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+      <TagPill tag={article.tag} />
     </div>
   );
 }
 
 /* ==========================================================================
-   1. CONTENT PROVIDER (temporary)
+   1. CONTENT SOURCE
    --------------------------------------------------------------------------
-   The ONLY part of this file that knows where Global Insights content comes
-   from. Today it returns the hardcoded articles below. When the CMS is
-   connected, replace the body of getGlobalInsightContent() so it returns the
-   same shape. Nothing in sections 2 and 3 needs to change.
+   All content comes from Sanity (see useElmivetContent):
+     - every published globalInsight article, newest first
+     - the single article chosen under "GlobalInsight page" in Featured Placements
+   The legacy `isFeatured` flag is not used. Nothing here is ever replaced by
+   sample articles: an empty result shows an empty state, a failure an error state.
 
-   Article shape
-     {
-       id,         required, unique (string or number)
-       title,      required
-       category,   required, one of CATEGORIES below
-       tag,        optional, label on the image (falls back to category)
-       excerpt,    optional
-       date,       optional, display text
-       readTime,   optional, display text
-       author,     optional, display text (featured article only)
-       imageAlt,   optional, accessible label for the image area
-     }
-
-   Content shape
-     { featured: Article | null, articles: Article[] }
-
-   Layout (column widths, "large" cards) is NOT part of the content.
+   Article shape (see toNewsroomArticle in lib/newsroom.js)
+     { id, key, title, slug, excerpt, category, tag, readTime, publishedAt,
+       date, longDate, author, cover: { url, alt, width, height } | null, body }
    ========================================================================== */
-const FEATURED_ARTICLE = {
-  id: "hero",
-  tag: "Industrial Cargo / Bonded Warehousing",
-  category: "Guangdong Hub",
-  title:
-    "Guangdong International Customs Bonded Warehouse Expands Processing Capacity for West African Trade",
-  excerpt:
-    "Elmivet's bonded facility in Guangdong has added dedicated consolidation, inspection and re-packing lines for exporters shipping to West African ports. The expansion shortens dwell time before vessel loading and gives importers earlier visibility on customs documentation.",
-  date: "November 6, 2026",
-  readTime: "7 min read",
-  author: "Elmivet Editorial Desk",
-  imageAlt: "Guangdong bonded warehouse and container yard",
-};
-
-const ARTICLES = [
-  {
-    id: 2,
-    category: "Port Operations",
-    tag: "Port Operations",
-    title: "Berth Scheduling Changes Affecting Lagos-Bound Consolidated Cargo",
-    excerpt:
-      "Revised vessel windows may shift gate-in deadlines. Here is what shippers need to confirm with their booking agents.",
-    date: "Nov 2, 2026",
-    readTime: "4 min read",
-  },
-  {
-    id: 3,
-    category: "Global Logistics",
-    tag: "Ocean Freight",
-    title: "Ocean Freight Rate Outlook for the Fourth Quarter",
-    excerpt:
-      "A look at capacity, surcharges and routing trends on Asia to West Africa lanes.",
-    date: "Oct 30, 2026",
-    readTime: "6 min read",
-  },
-  {
-    id: 4,
-    category: "Regulatory Notice",
-    tag: "Import Duties",
-    title: "Reminder: Pre-Shipment Inspection Rules for Nigerian Importers",
-    excerpt:
-      "A plain-language summary of inspection steps, certificates and typical timelines.",
-    date: "Oct 27, 2026",
-    readTime: "5 min read",
-  },
-  {
-    id: 5,
-    category: "Guangdong Hub",
-    tag: "Warehouse Update",
-    title: "New Cut-Off Times for Guangdong Hub Cargo Receiving",
-    excerpt:
-      "Updated receiving hours and weekend handling arrangements for peak shipping weeks.",
-    date: "Oct 24, 2026",
-    readTime: "3 min read",
-  },
-  {
-    id: 6,
-    category: "Global Logistics",
-    tag: "Supply Chain",
-    title: "Building Resilient Supply Chains Across Two Continents",
-    excerpt:
-      "How buyers are splitting shipments, buffering stock and using bonded storage to manage disruption.",
-    date: "Oct 20, 2026",
-    readTime: "8 min read",
-  },
-  {
-    id: 7,
-    category: "Port Operations",
-    tag: "Terminal Notice",
-    title: "Terminal Congestion Watch: Dwell Times at Major West African Ports",
-    excerpt:
-      "Our weekly read on yard density, discharge delays and what they mean for delivery planning and demurrage exposure.",
-    date: "Oct 17, 2026",
-    readTime: "6 min read",
-  },
-];
-
-function getGlobalInsightContent() {
-  return { featured: FEATURED_ARTICLE, articles: ARTICLES };
-}
 
 /* ==========================================================================
    2. SELECTION LOGIC (pure functions, no JSX)
@@ -268,15 +213,15 @@ const SPAN_CLASSES = {
 };
 const LARGE_FROM_SPAN = 7;
 
-function FeaturedArticle({ article, isOpened, onOpen }) {
+function FeaturedArticle({ article, onOpen }) {
   return (
     <Reveal>
       <article className="overflow-hidden border border-slate-200 bg-white shadow-lg">
         <div className="grid lg:grid-cols-5">
           <div className="lg:col-span-3">
-            <ImagePlaceholder
-              tag={article.tag ?? article.category}
-              label={article.imageAlt ?? `${article.title} header image`}
+            <CoverImage
+              article={article}
+              sizes="(min-width: 1024px) 60vw, 100vw"
               className="aspect-video lg:aspect-auto lg:h-full lg:min-h-[26rem]"
             />
           </div>
@@ -286,10 +231,12 @@ function FeaturedArticle({ article, isOpened, onOpen }) {
               <span className="bg-[#D9232D] px-2.5 py-1 font-semibold uppercase tracking-widest text-white">
                 Latest Dispatch
               </span>
-              {article.date && (
-                <span className="font-medium text-slate-500">{article.date}</span>
+              {article.longDate && (
+                <time dateTime={article.publishedAt} className="font-medium text-slate-500">
+                  {article.longDate}
+                </time>
               )}
-              {article.date && article.readTime && (
+              {article.longDate && article.readTime && (
                 <span className="text-slate-300" aria-hidden="true">|</span>
               )}
               {article.readTime && (
@@ -323,8 +270,9 @@ function FeaturedArticle({ article, isOpened, onOpen }) {
 
             <button
               type="button"
-              onClick={() => onOpen(article.id)}
-              aria-pressed={isOpened}
+              onClick={(event) => onOpen(article, event)}
+              aria-haspopup="dialog"
+              aria-label={`Read full dispatch: ${article.title}`}
               className="mt-8 w-fit bg-[#0A2540] px-6 py-3 font-sans text-sm font-semibold text-white transition-colors hover:bg-[#071a2e]"
             >
               Read Full Dispatch →
@@ -336,12 +284,13 @@ function FeaturedArticle({ article, isOpened, onOpen }) {
   );
 }
 
-function ArticleCard({ article, large, isOpened, onOpen }) {
+function ArticleCard({ article, large, onOpen }) {
   return (
     <article className="group flex h-full flex-col border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-lg">
-      <ImagePlaceholder
-        tag={article.tag ?? article.category}
-        label={`${article.title} header image`}
+      <CoverImage
+        article={article}
+        ratio={large ? 0.5 : 0.5625}
+        sizes={large ? "(min-width: 1024px) 58vw, 100vw" : "(min-width: 1024px) 33vw, 100vw"}
         className={large ? "aspect-video lg:aspect-[2/1]" : "aspect-video"}
       />
 
@@ -370,7 +319,9 @@ function ArticleCard({ article, large, isOpened, onOpen }) {
 
         <div className="mt-6 flex items-center justify-between border-t border-slate-200 pt-4 font-sans text-xs text-slate-500">
           <span>
-            {article.date}
+            {article.publishedAt ? (
+              <time dateTime={article.publishedAt}>{article.date}</time>
+            ) : null}
             {article.date && article.readTime && (
               <span className="mx-2 text-slate-300" aria-hidden="true">|</span>
             )}
@@ -378,12 +329,12 @@ function ArticleCard({ article, large, isOpened, onOpen }) {
           </span>
           <button
             type="button"
-            onClick={() => onOpen(article.id)}
-            aria-pressed={isOpened}
+            onClick={(event) => onOpen(article, event)}
+            aria-haspopup="dialog"
             aria-label={`View article: ${article.title}`}
             className="font-semibold text-[#0A2540] transition-colors hover:text-[#D9232D]"
           >
-            {isOpened ? "Opened ✓" : "View →"}
+            View →
           </button>
         </div>
       </div>
@@ -391,7 +342,7 @@ function ArticleCard({ article, large, isOpened, onOpen }) {
   );
 }
 
-function ArticleGrid({ articles, opened, onOpen }) {
+function ArticleGrid({ articles, onOpen }) {
   const spans = buildRowLayout(articles.length).flat();
 
   return (
@@ -405,11 +356,62 @@ function ArticleGrid({ articles, opened, onOpen }) {
           <ArticleCard
             article={article}
             large={spans[i] >= LARGE_FROM_SPAN}
-            isOpened={opened === article.id}
             onOpen={onOpen}
           />
         </Reveal>
       ))}
+    </div>
+  );
+}
+
+function NewsroomSkeleton() {
+  return (
+    <div aria-busy="true" aria-label="Loading dispatches" role="status" className="mt-10">
+      <div className="editorial-grid !grid-cols-1 gap-8 lg:!grid-cols-12">
+        {[
+          "lg:col-span-7",
+          "lg:col-span-5",
+          "lg:col-span-4",
+          "lg:col-span-4 hidden lg:block",
+          "lg:col-span-4 hidden lg:block",
+        ].map((span, i) => (
+          <div key={i} className={`border border-slate-200 bg-white shadow-sm ${span}`}>
+            <div className="aspect-video animate-pulse bg-slate-200 motion-reduce:animate-none" />
+            <div className="space-y-3 p-6">
+              <div className="h-3 w-1/3 animate-pulse bg-slate-200 motion-reduce:animate-none" />
+              <div className="h-6 w-4/5 animate-pulse bg-slate-200 motion-reduce:animate-none" />
+              <div className="h-4 w-full animate-pulse bg-slate-100 motion-reduce:animate-none" />
+              <div className="h-4 w-2/3 animate-pulse bg-slate-100 motion-reduce:animate-none" />
+            </div>
+          </div>
+        ))}
+      </div>
+      <span className="sr-only">Loading dispatches…</span>
+    </div>
+  );
+}
+
+function NewsroomErrorState({ error, onRetry }) {
+  const info = describeSanityError(error);
+  return (
+    <div
+      role="alert"
+      className="mt-10 border border-slate-200 border-l-4 border-l-[#D9232D] bg-white p-6 shadow-sm sm:p-8"
+    >
+      <p className="font-serif text-2xl font-bold text-[#0A2540]">
+        The newsroom could not be loaded right now.
+      </p>
+      <p className="mt-3 font-sans text-sm leading-relaxed text-slate-600">{info.headline}</p>
+      <p className="mt-1 break-words font-sans text-xs leading-relaxed text-slate-500">
+        {info.detail}
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="mt-5 bg-[#0A2540] px-5 py-2.5 font-sans text-sm font-semibold text-white transition-colors hover:bg-[#071a2e]"
+      >
+        Try again
+      </button>
     </div>
   );
 }
@@ -435,12 +437,41 @@ function NewsroomEmptyState() {
    ========================================================================== */
 export default function GlobalInsight() {
   const [active, setActive] = useState("All");
-  const [opened, setOpened] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  const { featured, articles } = getGlobalInsightContent();
-  const hasFeatured = Boolean(featured?.title);
-  const visibleArticles = filterByCategory(articles, active);
-  const hasArticles = articles.length > 0;
+  const { insights, featured, loading, error, refetch } = useElmivetContent();
+
+  /* The reader is driven by the URL (?article=<slug>) so a dispatch can be linked to, the
+     browser Back button closes it, and the homepage cards can deep-link straight into it. */
+  const openKey = searchParams.get("article");
+  const openArticle = (article) => {
+    const next = new URLSearchParams(searchParams);
+    next.set("article", article.key);
+    setSearchParams(next, { state: { reader: true } });
+  };
+  const closeArticle = () => {
+    if (location.state?.reader) {
+      navigate(-1); // opened from this page: Back and Close behave the same
+      return;
+    }
+    const next = new URLSearchParams(searchParams); // opened from a link: just drop the parameter
+    next.delete("article");
+    setSearchParams(next, { replace: true });
+  };
+  const readerSummary =
+    openKey &&
+    [featured, ...insights].find((a) => a && (a.key === openKey || a.slug === openKey || a.id === openKey));
+
+  /* The featured article is the hero; the feed lists the others so nothing appears twice.
+     (An article may still be featured on the homepage too: that selection is independent.) */
+  const feedArticles = featured ? insights.filter((a) => a.id !== featured.id) : insights;
+  const visibleArticles = filterByCategory(feedArticles, active);
+  const hasFeatured = !loading && !error && Boolean(featured);
+  const hasFeed = feedArticles.length > 0;
+  const nothingPublished = !loading && !error && insights.length === 0 && !featured;
+  const updatedLabel = loading || error ? "" : latestPublishedLabel(featured ? [featured, ...insights] : insights);
 
   return (
     <main className="bg-slate-50 text-slate-700">
@@ -451,7 +482,7 @@ export default function GlobalInsight() {
             <span className="font-semibold uppercase tracking-widest text-[#0A2540]">
               Elmivet Newsroom
             </span>
-            <span>Updated November 10, 2026</span>
+            {updatedLabel && <span>Updated {updatedLabel}</span>}
           </div>
 
           <span className="inline-block font-sans text-xs font-semibold uppercase tracking-widest text-[#D9232D]">
@@ -472,18 +503,13 @@ export default function GlobalInsight() {
 
       <div className="container section-padding">
         {/* ---------------- 2. Hero article ---------------- */}
-        {hasFeatured && (
-          <FeaturedArticle
-            article={featured}
-            isOpened={opened === featured.id}
-            onOpen={setOpened}
-          />
-        )}
+        {hasFeatured && <FeaturedArticle article={featured} onOpen={openArticle} />}
 
         {/* ---------------- 3. News feed ---------------- */}
         <section
           aria-labelledby="feed-heading"
           className={hasFeatured ? "mt-16" : ""}
+          aria-busy={loading}
         >
           <div className="flex flex-col gap-5 border-b border-slate-300 pb-5 md:flex-row md:items-end md:justify-between">
             <h2
@@ -493,7 +519,7 @@ export default function GlobalInsight() {
               Newsroom Feed
             </h2>
 
-            {hasArticles && (
+            {hasFeed && !loading && !error && (
               <div
                 role="group"
                 aria-label="Filter news by category"
@@ -518,15 +544,23 @@ export default function GlobalInsight() {
             )}
           </div>
 
-          {hasArticles ? (
+          {loading && <NewsroomSkeleton />}
+
+          {error && <NewsroomErrorState error={error} onRetry={refetch} />}
+
+          {nothingPublished && <NewsroomEmptyState />}
+
+          {!loading && !error && !nothingPublished && !hasFeed && (
+            <p role="status" className="mt-10 font-sans text-slate-500">
+              The featured dispatch above is our only published dispatch for now. New dispatches will
+              appear here as soon as they are published.
+            </p>
+          )}
+
+          {!loading && !error && hasFeed && (
             <>
               {/* key remounts cards so the entrance animation replays on filter */}
-              <ArticleGrid
-                key={active}
-                articles={visibleArticles}
-                opened={opened}
-                onOpen={setOpened}
-              />
+              <ArticleGrid key={active} articles={visibleArticles} onOpen={openArticle} />
 
               {visibleArticles.length === 0 && (
                 <p className="mt-10 font-sans text-slate-500">
@@ -535,8 +569,6 @@ export default function GlobalInsight() {
                 </p>
               )}
             </>
-          ) : (
-            <NewsroomEmptyState />
           )}
         </section>
 
@@ -553,6 +585,16 @@ export default function GlobalInsight() {
           </div>
         </Reveal>
       </div>
+
+      {/* ---------------- Full article reader ---------------- */}
+      {openKey && (
+        <ArticleReader
+          key={openKey}
+          articleKey={openKey}
+          summary={readerSummary || null}
+          onClose={closeArticle}
+        />
+      )}
     </main>
   );
 }

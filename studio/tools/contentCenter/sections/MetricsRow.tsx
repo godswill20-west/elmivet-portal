@@ -6,7 +6,7 @@ import {StatusBadge} from '../components/StatusBadge'
 import {useCountUp} from '../hooks/useCountUp'
 import {sparklinePath} from '../lib/articles'
 import {stagger} from '../lib/style'
-import type {DashboardStats, OrganogramSummary} from '../lib/types'
+import type {DashboardStats} from '../lib/types'
 
 interface MetricCardProps {
   label: string
@@ -48,10 +48,17 @@ function Sparkline({points}: {points: string}) {
   )
 }
 
+/** What the Organogram card needs from the version history. */
+export interface OrganogramMetric {
+  loading: boolean
+  /** The current version, or null when none is current. */
+  current: {versionLabel: string; effectiveLabel: string | null} | null
+}
+
 interface MetricsRowProps {
   /** Null while the articles are loading or could not be loaded. */
   stats: DashboardStats | null
-  organogram: OrganogramSummary
+  organogram: OrganogramMetric
 }
 
 export function MetricsRow({stats, organogram}: MetricsRowProps) {
@@ -95,11 +102,21 @@ export function MetricsRow({stats, organogram}: MetricsRowProps) {
       </MetricCard>
       <MetricCard label="Organogram" icon="org" index={5}>
         <div className="ecc-metric-num ecc-metric-num--status">
-          <StatusBadge tone="live">Live</StatusBadge>
+          {organogram.loading ? (
+            <span className="ecc-note">Loading…</span>
+          ) : organogram.current ? (
+            <StatusBadge tone="live">Current</StatusBadge>
+          ) : (
+            <StatusBadge tone="draft">None current</StatusBadge>
+          )}
         </div>
         <div className="ecc-metric-foot">
           <span>
-            Version {organogram.version} · {organogram.effectiveLabel}
+            {organogram.loading
+              ? 'Reading versions'
+              : organogram.current
+                ? `${organogram.current.versionLabel}${organogram.current.effectiveLabel ? ` · ${organogram.current.effectiveLabel}` : ''}`
+                : 'No version published'}
           </span>
         </div>
       </MetricCard>

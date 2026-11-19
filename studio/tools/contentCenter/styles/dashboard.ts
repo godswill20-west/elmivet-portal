@@ -96,4 +96,19 @@ export const dashboard = `
 .ecc-preview-chip { margin-left: 8px; white-space: nowrap; padding: 3px 10px; border: 1px solid rgba(255,255,255,.22); border-radius: 999px; background: rgba(255,255,255,.08); font-size: 10.5px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: #C9D6E6; }
 .ecc-metric-num--status { padding-top: 8px; font-size: 26px; }
 .ecc-metric-num--status .ecc-badge { font-size: 13px; }
+.ecc-versions{margin-top:18px;padding-top:14px;border-top:1px solid var(--ecc-line);font-size:12.5px}
+.ecc-versions ul{list-style:none;margin:0;padding:0;max-height:420px;overflow-y:auto}
+.ecc-versions li{padding:10px 0;border-bottom:1px solid var(--ecc-line)}
+.ecc-versions li:last-child{border-bottom:0}
+.ecc-ver-top{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.ecc-ver-top b{color:var(--ecc-ink);font-weight:600}
+.ecc-ver-tag{padding:2px 8px;border-radius:999px;background:var(--ecc-ivory2);color:var(--ecc-muted);font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.ecc-ver-tag--current{background:var(--ecc-navy);color:#fff}
+.ecc-ver-tag--latest{background:var(--ecc-amberbg);color:var(--ecc-amber)}
+.ecc-ver-tag--warn{background:var(--ecc-amberbg);color:var(--ecc-amber)}
+.ecc-ver-meta{margin:4px 0 0;color:var(--ecc-muted)}
+.ecc-ver-meta--warn{color:var(--ecc-amber)}
+.ecc-ver-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.ecc-ver-actions .ecc-btn{text-decoration:none}
+.ecc-ver-state{display:grid;gap:8px;margin-bottom:12px}
 `

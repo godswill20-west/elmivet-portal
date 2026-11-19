@@ -19,15 +19,18 @@ import {
   Truck,
 } from 'lucide-react';
 import { imageUrl, useFeaturedInsights } from '../hooks/useElmivetContent';
+import { describeSanityError } from '../lib/sanityConfig';
 import { buildInsightHref, getLayoutVariant, normalizeInsights } from '../lib/featuredInsights';
 
 /* ------------------------------------------------------------------ *
  *  CONTENT
  * ------------------------------------------------------------------ */
 const INSIGHTS_PATH = '/globalInsight';
-/* Set to e.g. '/global-insight' once article detail pages exist; until then every card
-   links to the listing page, exactly as before. Missing/invalid slugs always fall back. */
+/* There is no separate article page: each card opens that article in the full-article reader on
+   the Global Insight page (/globalInsight?article=<slug>). Missing/invalid slugs fall back to the
+   listing. Set INSIGHT_DETAIL_PATH (e.g. '/global-insight') only if article pages are added later. */
 const INSIGHT_DETAIL_PATH = null;
+const INSIGHT_READER_PARAM = 'article';
 const QUOTE_EMAIL = 'quotes@elmivet.com';
 const QUOTE_MAILTO = `mailto:${QUOTE_EMAIL}?subject=${encodeURIComponent(
   'Cargo Quote Request'
@@ -137,37 +140,6 @@ const SERVE_ITEMS = [
   {
     title: 'Government Institutions, Public Sector & Statutory Bodies',
     image: '/images/audiences/audience-government.webp',
-  },
-];
-
-/* ------------------------------------------------------------------ *
- *  TEMPORARY: sample dispatches shown ONLY while Sanity has no featured articles
- *  (or cannot be reached). Set to false when your CMS content is ready, then you can
- *  delete SAMPLE_INSIGHTS. As soon as at least one published article has isFeatured
- *  switched on, the live articles are shown and these samples disappear.
- * ------------------------------------------------------------------ */
-const SHOW_SAMPLES_UNTIL_CMS_READY = true;
-const SAMPLE_INSIGHTS = [
-  {
-    _id: 'sample-1',
-    category: 'Port Operations',
-    title: 'Guangdong Bonded Hub Logistics Expansion',
-    excerpt:
-      'What expanding bonded-hub capacity in Guangdong means for sourcing, consolidation and onward shipping to West Africa.',
-  },
-  {
-    _id: 'sample-2',
-    category: 'Regulatory Notice',
-    title: 'West Africa Port Clearance Regulations 2026',
-    excerpt:
-      'A practical briefing on clearance and documentation requirements for cargo moving through Nigeria, Benin Republic and Togo ports.',
-  },
-  {
-    _id: 'sample-3',
-    category: 'Market Intelligence',
-    title: 'Global Freight Rate Index Updates',
-    excerpt:
-      'The latest movements in global freight rates and what they signal for importers, exporters and trade merchants.',
   },
 ];
 
@@ -337,7 +309,7 @@ function InsightImage({ post, index, aspect, sizes }) {
         src={src(800)}
         srcSet={`${src(480)} 480w, ${src(800)} 800w, ${src(1200)} 1200w`}
         sizes={sizes}
-        alt={post.coverAlt}
+        alt={post.coverAlt || `Cover image: ${post.title}`}
         loading="lazy"
         decoding="async"
         onError={() => setFailed(true)}
@@ -348,7 +320,11 @@ function InsightImage({ post, index, aspect, sizes }) {
 }
 
 function InsightCard({ post, index, lead = false }) {
-  const href = buildInsightHref(post.slug, { listPath: INSIGHTS_PATH, detailBase: INSIGHT_DETAIL_PATH });
+  const href = buildInsightHref(post.slug, {
+    listPath: INSIGHTS_PATH,
+    detailBase: INSIGHT_DETAIL_PATH,
+    queryParam: INSIGHT_READER_PARAM,
+  });
 
   return (
     <Link to={href} className={`${CARD_BASE} ${lead ? 'lg:flex-row' : ''}`}>
@@ -371,6 +347,14 @@ function InsightCard({ post, index, lead = false }) {
       </div>
 
       <div className={`flex flex-1 flex-col p-6 ${lead ? 'lg:justify-center lg:p-10' : ''}`}>
+        {post.publishedAt && (
+          <time
+            dateTime={post.publishedAt}
+            className="mb-3 font-sans text-xs font-semibold uppercase tracking-widest text-muted"
+          >
+            {post.date}
+          </time>
+        )}
         <h3
           className={`font-serif font-semibold leading-snug text-heading ${
             lead ? 'text-2xl md:text-3xl lg:text-4xl' : 'text-2xl'
@@ -521,9 +505,8 @@ export function FeaturedInsightsView({ insights, loading = false, error = null, 
   const posts = useMemo(() => normalizeInsights(insights), [insights]);
   const variant = getLayoutVariant(posts.length);
   const failed = Boolean(error) && posts.length === 0;
-
-  // Nothing featured (and not loading / failed): remove the whole section, no empty space.
-  if (!loading && !failed && variant === 'none') return null;
+  const empty = !loading && !failed && variant === 'none';
+  const failure = failed ? describeSanityError(error) : null;
 
   return (
     <section
@@ -555,14 +538,34 @@ export function FeaturedInsightsView({ insights, loading = false, error = null, 
 
         {loading && posts.length === 0 && <InsightSkeleton />}
 
-        {failed && !loading && (
+        {empty && (
           <div
             role="status"
+            className="mt-14 border border-border border-l-4 border-l-accent bg-paper p-6 sm:p-8"
+          >
+            <p className="font-serif text-2xl font-semibold text-heading">
+              No featured dispatches right now
+            </p>
+            <p className="mt-2 text-base leading-relaxed text-body">
+              Featured dispatches and market intelligence will appear here as soon as they are
+              published. You can read everything we have published in the newsroom.
+            </p>
+          </div>
+        )}
+
+        {failed && !loading && (
+          <div
+            role="alert"
             className="mt-14 flex flex-col items-start gap-4 border border-border border-l-4 border-l-accent bg-paper p-6 sm:flex-row sm:items-center sm:justify-between"
           >
-            <p className="text-base leading-relaxed text-body">
-              Our latest dispatches are temporarily unavailable.
-            </p>
+            <div>
+              <p className="text-base leading-relaxed text-body">
+                Our latest dispatches could not be loaded right now.
+              </p>
+              <p className="mt-1 break-words text-xs leading-relaxed text-muted">
+                {failure.headline} {failure.detail}
+              </p>
+            </div>
             {onRetry && (
               <button
                 type="button"
@@ -619,20 +622,11 @@ export function FeaturedInsightsView({ insights, loading = false, error = null, 
 }
 
 function FeaturedInsights() {
+  // The homepage list comes ONLY from the "Homepage Featured Stories" selection in Sanity.
+  // No sample articles: empty -> empty state, failure -> error state.
   const { data, loading, error, refetch } = useFeaturedInsights();
 
-  // Temporary: nothing usable from Sanity (empty or failed) -> show the sample dispatches.
-  const useSamples =
-    SHOW_SAMPLES_UNTIL_CMS_READY && !loading && normalizeInsights(data).length === 0;
-
-  return (
-    <FeaturedInsightsView
-      insights={useSamples ? SAMPLE_INSIGHTS : data}
-      loading={loading}
-      error={useSamples ? null : error}
-      onRetry={refetch}
-    />
-  );
+  return <FeaturedInsightsView insights={data} loading={loading} error={error} onRetry={refetch} />;
 }
 
 /* A rendering fault in this section hides it instead of taking down the homepage. */
@@ -648,7 +642,26 @@ class FeaturedInsightsBoundary extends Component {
   }
 
   render() {
-    return this.state.failed ? null : this.props.children;
+    if (!this.state.failed) return this.props.children;
+    return (
+      <section
+        aria-label="Global Insights and Market Intelligence"
+        className="border-t border-border bg-white py-20"
+      >
+        <div className="mx-auto max-w-[75rem] px-5">
+          <div role="alert" className="border border-border border-l-4 border-l-accent bg-paper p-6">
+            <p className="text-base leading-relaxed text-body">
+              The latest dispatches could not be displayed because of a page error. Please refresh,
+              or read them in the{' '}
+              <Link to={INSIGHTS_PATH} className="font-semibold text-primary underline hover:text-accent">
+                newsroom
+              </Link>
+              .
+            </p>
+          </div>
+        </div>
+      </section>
+    );
   }
 }
 

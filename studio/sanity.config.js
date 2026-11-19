@@ -92,6 +92,7 @@ const deskStructure = (S) =>
           S.documentTypeList('organogram')
             .title('Corporate Organogram (Versions)')
             .defaultOrdering([
+              {field: 'versionNumber', direction: 'desc'},
               {field: 'effectiveDate', direction: 'desc'},
               {field: '_createdAt', direction: 'desc'},
             ]),

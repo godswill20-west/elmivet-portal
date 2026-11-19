@@ -55,4 +55,30 @@ export const content = `
 .ecc-input[readonly] { background: var(--ecc-ivory); }
 button.ecc-drop { width: 100%; font: inherit; }
 .ecc-close { display: grid; place-items: center; padding: 0; }
+
+/* Cover photograph field (Create / Edit Article). */
+.ecc-cover-file { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
+.ecc-drop:disabled { opacity: .6; cursor: not-allowed; }
+.ecc-drop--active { border-color: var(--ecc-navy); background: var(--ecc-ivory2); }
+.ecc-cover-card { border: 1px solid var(--ecc-line); border-radius: 14px; background: #fff; overflow: hidden; }
+.ecc-cover-frame { position: relative; aspect-ratio: 16 / 9; background: var(--ecc-ivory2); display: grid; place-items: center; }
+.ecc-cover-frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ecc-cover-wait { font-size: 12.5px; color: var(--ecc-muted); }
+.ecc-cover-meta { display: grid; gap: 10px; padding: 12px 14px; }
+.ecc-cover-file-info { margin: 0; font-size: 12.5px; color: var(--ecc-muted); overflow-wrap: anywhere; }
+.ecc-cover-file-info b { color: var(--ecc-navy); font-weight: 600; }
+.ecc-cover-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.ecc-cover-removed { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--ecc-amberbg); color: var(--ecc-amber); font-size: 12.5px; }
+.ecc-cover-alt { margin-top: 14px; }
+.ecc-cover-alt .ecc-note, .ecc-cover-error { margin: 6px 0 0; }
+.ecc-cover-error { font-size: 12.5px; color: var(--ecc-red); }
+.ecc-cover-alt .ecc-input[aria-invalid=true] { border-color: var(--ecc-red); }
+.ecc-cover-alt .ecc-input[aria-invalid=true]:focus { box-shadow: 0 0 0 3px rgba(200,30,40,.14); }
+.ecc-cover-empty-note { margin: 8px 0 0; }
+
+.ecc-pdf-frame { position: relative; height: 320px; background: var(--ecc-ivory2); display: grid; place-items: center; }
+.ecc-pdf-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; }
+.ecc-progress { height: 6px; border-radius: 999px; background: var(--ecc-ivory2); overflow: hidden; }
+.ecc-progress span { display: block; height: 100%; background: var(--ecc-navy); transition: width .2s ease; }
+
 `
