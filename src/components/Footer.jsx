@@ -363,8 +363,7 @@ export default function Footer() {
             <span className="hover:text-slate-200 cursor-pointer transition-colors">Customs Brokerage Terms</span>
             <a 
               href="/privacy_policy.pdf" 
-              target="_blank" 
-              rel="noopener noreferrer" 
+              download="Privacy_Policy.pdf" 
               className="hover:text-slate-200 cursor-pointer transition-colors"
             >
               Privacy Policy
