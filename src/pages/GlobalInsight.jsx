@@ -6,6 +6,7 @@ import { latestPublishedLabel } from "../lib/newsroom";
 import ArticleReader from "../components/ArticleReader";
 import Seo from '../components/Seo';
 import { PAGE_SEO } from '../lib/seo';
+import useArticleHead from "../hooks/useArticleHead";
 
 /* ==========================================================================
    Scroll-triggered reveal: adds `animate-mouth-opening` when the element
@@ -472,6 +473,11 @@ export default function GlobalInsight() {
     openKey &&
     [featured, ...insights].find((a) => a && (a.key === openKey || a.slug === openKey || a.id === openKey));
 
+  /* Article URLs carry server-written metadata (api/global-insight.js). Keep it in step in place
+     instead of rendering <Seo>, whose hoisted tags would duplicate the server's canonical, description,
+     Open Graph and Twitter tags. Legacy ?article= links keep the newsroom metadata, as before. */
+  useArticleHead(routeSlug, readerSummary || null);
+
   /* The featured article is the hero; the feed lists the others so nothing appears twice.
      (An article may still be featured on the homepage too: that selection is independent.) */
   const feedArticles = featured ? insights.filter((a) => a.id !== featured.id) : insights;
@@ -483,7 +489,7 @@ export default function GlobalInsight() {
 
   return (
     <main className="bg-slate-50 text-slate-700">
-      <Seo {...PAGE_SEO.globalInsight} />
+      {!routeSlug && <Seo {...PAGE_SEO.globalInsight} />}
       {/* ---------------- 1. Newsroom header ---------------- */}
       <header className="border-b border-slate-200 bg-white">
         <div className="container section-padding">

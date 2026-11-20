@@ -1,5 +1,9 @@
 {
+  "functions": {
+    "api/global-insight.js": { "includeFiles": "dist/index.html" }
+  },
   "rewrites": [
+    { "source": "/global-insight/:slug", "destination": "/api/global-insight?slug=:slug" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
