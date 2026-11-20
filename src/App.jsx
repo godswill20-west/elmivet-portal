@@ -1,6 +1,6 @@
 
 import React, { useEffect, Suspense, lazy } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 
@@ -35,10 +35,42 @@ function ScrollToHash() {
   return null;
 }
 
+function CanonicalPathRedirect() {
+  const location = useLocation();
+
+  // Article URLs (/global-insight/<slug>) keep the slug's original case, because the Sanity
+  // lookup is case-sensitive. Everything else is lowercased as before.
+  const articleMatch = location.pathname.match(/^\/global-?insight\/(.+)$/i);
+  const lowerPath = articleMatch
+    ? `/global-insight/${articleMatch[1]}`
+    : location.pathname.toLowerCase();
+
+  const canonicalPath =
+    lowerPath === '/globalinsight'
+      ? '/global-insight'
+      : lowerPath;
+
+  if (location.pathname !== canonicalPath) {
+    return (
+      <Navigate
+        to={{
+          pathname: canonicalPath,
+          search: location.search,
+          hash: location.hash,
+        }}
+        replace
+      />
+    );
+  }
+
+  return null;
+}
+
 export default function App() {
   return (
     <div className="min-h-screen flex flex-col bg-bg-main text-text-body font-sans">
       <ScrollToHash />
+      <CanonicalPathRedirect />
 
       {/* Sticky Navigation Header */}
       <Navbar />
@@ -54,9 +86,10 @@ export default function App() {
         >
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/About" element={<About />} />
-            <Route path="/Services" element={<Services />} />
-            <Route path="/GlobalInsight" element={<GlobalInsight />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/services" element={<Services />} />
+            <Route path="/global-insight" element={<GlobalInsight />} />
+            <Route path="/global-insight/:slug" element={<GlobalInsight />} />
             <Route path="/contact" element={<Contact />} />
           </Routes>
         </Suspense>

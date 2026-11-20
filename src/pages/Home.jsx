@@ -1,5 +1,7 @@
 import { Component, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import Seo from '../components/Seo';
+import { PAGE_SEO } from '../lib/seo';
 import {
   Anchor,
   ArrowLeft,
@@ -26,10 +28,10 @@ import { buildInsightHref, getLayoutVariant, normalizeInsights } from '../lib/fe
  *  CONTENT
  * ------------------------------------------------------------------ */
 const INSIGHTS_PATH = '/globalInsight';
-/* There is no separate article page: each card opens that article in the full-article reader on
-   the Global Insight page (/globalInsight?article=<slug>). Missing/invalid slugs fall back to the
-   listing. Set INSIGHT_DETAIL_PATH (e.g. '/global-insight') only if article pages are added later. */
-const INSIGHT_DETAIL_PATH = null;
+/* Each card links to the dedicated article URL (/global-insight/<slug>), which opens the article in
+   the full-article reader on the Global Insight page. Missing/invalid slugs fall back to the
+   listing. The legacy ?article=<slug> form still works for old links and bookmarks. */
+const INSIGHT_DETAIL_PATH = '/global-insight';
 const INSIGHT_READER_PARAM = 'article';
 const QUOTE_EMAIL = 'quotes@elmivet.com';
 const QUOTE_MAILTO = `mailto:${QUOTE_EMAIL}?subject=${encodeURIComponent(
@@ -681,6 +683,7 @@ export default function Home() {
 
   return (
     <main className="flex-1 bg-paper font-sans text-body">
+      <Seo {...PAGE_SEO.home} />
       {/* ============================================================ *
        *  1. HERO + PROPRIETARY TECHNOLOGY (ElmiveTrack & ElmivetHub)
        * ============================================================ */}

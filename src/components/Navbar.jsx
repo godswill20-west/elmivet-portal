@@ -18,9 +18,9 @@ import {
 const NAV_ITEMS = [
   { label: 'Home', to: '/' },
   { label: 'Services', to: '/services', mega: true },
-  { label: 'About', to: '/About' },
+  { label: 'About', to: '/about' },
   { label: 'Contact & Support', to: '/contact' },
-  { label: 'Global Insight', to: '/GlobalInsight' },
+  { label: 'Global Insight', to: '/global-insight' },
 ];
 
 const CTA = { label: 'Book for Consultation' };

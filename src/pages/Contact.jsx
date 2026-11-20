@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import Seo from '../components/Seo';
+import { PAGE_SEO } from '../lib/seo';
 import {
   Globe,
   Building2,
@@ -219,6 +221,7 @@ const linkClass =
 export default function Contact() {
   return (
     <main className="bg-slate-50 text-slate-700">
+      <Seo {...PAGE_SEO.contact} />
       {/* ---------------- 1a. Hero banner ---------------- */}
       <section
         aria-labelledby="hubs-heading"

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, lazy, Suspense } from "react";
+import Seo from '../components/Seo';
+import { PAGE_SEO } from '../lib/seo';
 
 
 // Standalone Form Components — Lazy-loaded on demand
@@ -475,6 +477,7 @@ export default function Services() {
 
   return (
     <main className="bg-slate-50 text-slate-700">
+      <Seo {...PAGE_SEO.services} />
       {/* ---------------- Hero ---------------- */}
       <header className="relative overflow-hidden bg-[#0A2540]">
         <div

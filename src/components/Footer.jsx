@@ -117,7 +117,7 @@ export default function Footer() {
             <li><NavLink to="/services#get-quote" className="hover:text-[#D9232D] transition-colors">Get a Quote</NavLink></li>
             <li><NavLink to="/contact#customer-support" className="hover:text-[#D9232D] transition-colors">Customer Support</NavLink></li>
             <li><NavLink to="/services" className="hover:text-[#D9232D] transition-colors">Services & Global Freight</NavLink></li>
-            <li><NavLink to="/Contact#hubs" className="hover:text-[#D9232D] transition-colors">China Office & Bonded Hubs</NavLink></li>
+            <li><NavLink to="/contact#hubs" className="hover:text-[#D9232D] transition-colors">China Office & Bonded Hubs</NavLink></li>
           </ul>
           <div>
               <a 
@@ -137,11 +137,11 @@ export default function Footer() {
             Our Divisions
           </h3>
           <ul className="space-y-2.5 text-sm text-slate-300">
-            <li><NavLink to="/Services#global-trade" className="hover:text-[#D9232D] transition-colors">Global Trade</NavLink></li>
-            <li><NavLink to="/Services#logistics-supply-chain" className="hover:text-[#D9232D] transition-colors">Logistics & Supply Chain</NavLink></li>
+            <li><NavLink to="/services#global-trade" className="hover:text-[#D9232D] transition-colors">Global Trade</NavLink></li>
+            <li><NavLink to="/services#logistics-supply-chain" className="hover:text-[#D9232D] transition-colors">Logistics & Supply Chain</NavLink></li>
             <li><NavLink to="/services#commercial" className="hover:text-[#D9232D] transition-colors">Commercial</NavLink></li>
-            <li><NavLink to="/Services#industrial" className="hover:text-[#D9232D] transition-colors">Industrial</NavLink></li>
-            <li><NavLink to="/Services#china-hub" className="hover:text-[#D9232D] transition-colors">China Operations</NavLink></li>
+            <li><NavLink to="/services#industrial" className="hover:text-[#D9232D] transition-colors">Industrial</NavLink></li>
+            <li><NavLink to="/services#china-hub" className="hover:text-[#D9232D] transition-colors">China Operations</NavLink></li>
           </ul>
         </div>
 
@@ -151,10 +151,10 @@ export default function Footer() {
             Company Information
           </h3>
           <ul className="space-y-2.5 text-sm text-slate-300">
-            <li><NavLink to="/About" className="hover:text-[#D9232D] transition-colors">About Elmivet</NavLink></li>
-            <li><NavLink to="/About#leadership" className="hover:text-[#D9232D] transition-colors">Leadership</NavLink></li>
-            <li><NavLink to="/About#Mission" className="hover:text-[#D9232D] transition-colors">Our Mission & Vision</NavLink></li>
-            <li><NavLink to="/Contact#regionalOperations" className="hover:text-[#D9232D] transition-colors">Cargo Drop-Off</NavLink></li>
+            <li><NavLink to="/about" className="hover:text-[#D9232D] transition-colors">About Elmivet</NavLink></li>
+            <li><NavLink to="/about#leadership" className="hover:text-[#D9232D] transition-colors">Leadership</NavLink></li>
+            <li><NavLink to="/about#Mission" className="hover:text-[#D9232D] transition-colors">Our Mission & Vision</NavLink></li>
+            <li><NavLink to="/contact#regionalOperations" className="hover:text-[#D9232D] transition-colors">Cargo Drop-Off</NavLink></li>
           </ul>
         </div>
 

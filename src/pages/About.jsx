@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useCurrentOrganogram } from "../hooks/useElmivetContent";
 import { describeSanityError } from "../lib/sanityConfig";
-
+import Seo from '../components/Seo';
+import { PAGE_SEO } from '../lib/seo';
 /* ==========================================================================
    Scroll-triggered reveal using the project's `animate-mouth-opening` class.
    Stays hidden (opacity-0) until it enters the viewport, then plays once.
@@ -237,6 +238,7 @@ export default function About() {
   const versionLine = organogram.data ? organogramVersionLine(organogram.data) : "";
   return (
     <main className="bg-slate-50 text-slate-700">
+      <Seo {...PAGE_SEO.about} />
       {/* ---------------- 1. Hero / company overview ---------------- */}
       <header className="relative overflow-hidden border-b border-slate-800 bg-[#0A2540] text-white">
         {/* HERO IMAGE (Unobstructed & Crisp) */}

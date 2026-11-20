@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import useElmivetContent, { imageUrl } from "../hooks/useElmivetContent";
 import { describeSanityError } from "../lib/sanityConfig";
 import { latestPublishedLabel } from "../lib/newsroom";
 import ArticleReader from "../components/ArticleReader";
+import Seo from '../components/Seo';
+import { PAGE_SEO } from '../lib/seo';
 
 /* ==========================================================================
    Scroll-triggered reveal: adds `animate-mouth-opening` when the element
@@ -443,22 +445,28 @@ export default function GlobalInsight() {
 
   const { insights, featured, loading, error, refetch } = useElmivetContent();
 
-  /* The reader is driven by the URL (?article=<slug>) so a dispatch can be linked to, the
-     browser Back button closes it, and the homepage cards can deep-link straight into it. */
-  const openKey = searchParams.get("article");
+  /* The reader is driven by the URL: /global-insight/<slug> is the dedicated article URL, and the
+     legacy ?article=<slug> query parameter still works for old links and bookmarks. Either way the
+     browser Back button closes it, and the homepage cards deep-link straight into it. */
+  const { slug: routeSlug } = useParams(); // already URL-decoded by the router
+  const openKey = routeSlug || searchParams.get("article");
   const openArticle = (article) => {
-    const next = new URLSearchParams(searchParams);
-    next.set("article", article.key);
-    setSearchParams(next, { state: { reader: true } });
+    navigate(`/global-insight/${encodeURIComponent(article.key)}`, { state: { reader: true } });
   };
   const closeArticle = () => {
     if (location.state?.reader) {
       navigate(-1); // opened from this page: Back and Close behave the same
       return;
     }
-    const next = new URLSearchParams(searchParams); // opened from a link: just drop the parameter
-    next.delete("article");
-    setSearchParams(next, { replace: true });
+    const next = new URLSearchParams(searchParams);
+    next.delete("article"); // so a leftover legacy parameter cannot reopen the reader
+    if (routeSlug) {
+      // opened from a dedicated article link: go to the newsroom listing
+      const search = next.toString();
+      navigate({ pathname: "/global-insight", search: search ? `?${search}` : "" }, { replace: true });
+      return;
+    }
+    setSearchParams(next, { replace: true }); // opened from a legacy link: just drop the parameter
   };
   const readerSummary =
     openKey &&
@@ -475,6 +483,7 @@ export default function GlobalInsight() {
 
   return (
     <main className="bg-slate-50 text-slate-700">
+      <Seo {...PAGE_SEO.globalInsight} />
       {/* ---------------- 1. Newsroom header ---------------- */}
       <header className="border-b border-slate-200 bg-white">
         <div className="container section-padding">
