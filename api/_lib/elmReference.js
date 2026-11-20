@@ -1,57 +1,11 @@
 
 // api/_lib/elmReference.js
-//
-// Official Elmivet reference IDs are issued by the database.
-// This module:
-//   - requests an official reference for a stored submission;
-//   - validates newly generated references;
-//   - accepts valid historical references when an existing
-//     submission is retried.
-//
-// Quote format:
-// #ELM-1042[Division Code][Actual Website Form Number]-[Sequence]
-//
-// Consultation format remains:
-// #ELM-104200-[Sequence]
-//
-// The browser-supplied `reference` is only an idempotency token.
-// It is NOT the official reference.
 
 export const BASE = '#ELM-1042';
 export const CONSULTATION_PREFIX = '#ELM-104200';
 
-// Website form number -> [division code, actual website form number]
+// Website form number -> [division code, position within division]
 export const FORM_CODES = Object.freeze({
-  1: ['01', '01'],
-  2: ['01', '02'],
-  3: ['01', '03'],
-  4: ['01', '04'],
-  5: ['01', '05'],
-
-  6: ['02', '06'],
-  7: ['02', '07'],
-  8: ['02', '08'],
-  9: ['02', '09'],
-
-  10: ['03', '10'],
-  11: ['03', '11'],
-  12: ['03', '12'],
-  20: ['03', '20'],
-
-  13: ['04', '13'],
-  14: ['04', '14'],
-  15: ['04', '15'],
-  16: ['04', '16'],
-  17: ['04', '17'],
-  18: ['04', '18'],
-
-  19: ['05', '19'],
-});
-
-// Original division-local codes.
-// Used ONLY to validate references already assigned historically.
-// These codes must never be used to generate a new reference.
-export const LEGACY_FORM_CODES = Object.freeze({
   1: ['01', '01'],
   2: ['01', '02'],
   3: ['01', '03'],
@@ -78,13 +32,47 @@ export const LEGACY_FORM_CODES = Object.freeze({
   19: ['05', '01'],
 });
 
+// Previously generated actual-form-number prefixes.
+// Validation only: never use these to generate new references.
+export const LEGACY_FORM_CODES = Object.freeze({
+  1: ['01', '01'],
+  2: ['01', '02'],
+  3: ['01', '03'],
+  4: ['01', '04'],
+  5: ['01', '05'],
+
+  6: ['02', '06'],
+  7: ['02', '07'],
+  8: ['02', '08'],
+  9: ['02', '09'],
+
+  10: ['03', '10'],
+  11: ['03', '11'],
+  12: ['03', '12'],
+  20: ['03', '20'],
+
+  13: ['04', '13'],
+  14: ['04', '14'],
+  15: ['04', '15'],
+  16: ['04', '16'],
+  17: ['04', '17'],
+  18: ['04', '18'],
+
+  19: ['05', '19'],
+});
+
 function isValidFormNumber(formNumber) {
   return (
     Number.isInteger(formNumber) &&
-    formNumber >= 1 &&
-    formNumber <= 20 &&
     Object.hasOwn(FORM_CODES, formNumber)
   );
+}
+
+function buildPrefix(formNumber, mapping) {
+  const codes = mapping[formNumber];
+  if (!codes) return null;
+
+  return `${BASE}${codes[0]}${codes[1]}`;
 }
 
 export function quotePrefix(formNumber) {
@@ -92,17 +80,7 @@ export function quotePrefix(formNumber) {
     throw new Error(`No reference mapping for form ${formNumber}`);
   }
 
-  const [divisionCode, actualFormCode] = FORM_CODES[formNumber];
-
-  return `${BASE}${divisionCode}${actualFormCode}`;
-}
-
-function legacyQuotePrefix(formNumber) {
-  const codes = LEGACY_FORM_CODES[formNumber];
-
-  if (!codes) return null;
-
-  return `${BASE}${codes[0]}${codes[1]}`;
+  return buildPrefix(formNumber, FORM_CODES);
 }
 
 export function formatReference(prefix, n) {
@@ -121,22 +99,15 @@ export function isValidQuoteReference(ref, formNumber) {
     return false;
   }
 
-  const sequencePattern = /^[0-9]{3,}$/;
+  const prefixes = [
+    buildPrefix(formNumber, FORM_CODES),
+    buildPrefix(formNumber, LEGACY_FORM_CODES),
+  ];
 
-  const allowedPrefixes = new Set([
-    quotePrefix(formNumber),
-    legacyQuotePrefix(formNumber),
-  ]);
-
-  return [...allowedPrefixes].some((prefix) => {
-    if (!prefix) return false;
-
-    if (!ref.startsWith(`${prefix}-`)) return false;
-
-    return sequencePattern.test(
-      ref.slice(prefix.length + 1)
-    );
-  });
+  return prefixes.some((prefix) =>
+    ref.startsWith(`${prefix}-`) &&
+    /^[0-9]{3,}$/.test(ref.slice(prefix.length + 1))
+  );
 }
 
 export function isValidConsultationReference(ref) {
@@ -157,19 +128,12 @@ async function callAssign(supabase, fn, clientToken, isValid) {
   if (error) throw error;
 
   if (!isValid(data)) {
-    throw new Error(
-      'Database returned an unexpected reference format'
-    );
+    throw new Error('Database returned an unexpected reference format');
   }
 
   return data;
 }
 
-/**
- * Idempotent:
- * - New submissions receive the corrected actual-form reference.
- * - Existing submissions retain their original historical reference.
- */
 export function assignQuoteReference(
   supabase,
   clientToken,
