@@ -171,17 +171,22 @@ function normalize(body) {
 /* Email                                                               */
 /* ------------------------------------------------------------------ */
 
+
 function createTransporter(env) {
   return nodemailer.createTransport({
-    host: 'smtp.zoho.com',
+    host: 'smtp.resend.com',
     port: 465,
     secure: true,
-    auth: { user: env.smtpUser, pass: env.smtpPass },
+    auth: {
+      user: 'resend',
+      pass: env.resendApiKey,
+    },
     connectionTimeout: 10000,
     greetingTimeout: 10000,
     socketTimeout: 20000,
   });
 }
+
 
 function buildInternalEmail(rec, elmReference) {
   const rows = [
@@ -341,14 +346,14 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'POST');
     return fail(res, 405, 'Method not allowed.');
   }
-
+  
   const env = {
     supabaseUrl: process.env.SUPABASE_URL,
     supabaseKey: process.env.SUPABASE_SECRET_KEY,
-    smtpUser: process.env.ZOHO_SMTP_USER,
-    smtpPass: process.env.ZOHO_SMTP_PASS,
+    resendApiKey: process.env.RESEND_API_KEY,
   };
-  if (!env.supabaseUrl || !env.supabaseKey || !env.smtpUser || !env.smtpPass) {
+
+  if (!env.supabaseUrl || !env.supabaseKey || !env.resendApiKey) {
     console.error('[submit-consultation] missing server environment configuration');
     return fail(res, 500, 'Service is not configured. Please try again later.');
   }
