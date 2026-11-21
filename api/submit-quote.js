@@ -625,11 +625,6 @@ if (!env.supabaseUrl || !env.supabaseKey || !env.resendApiKey) {
   return fail(res, 500, 'Service is not configured. Please try again later.');
 }
 
-  if (!env.supabaseUrl || !env.supabaseKey || !env.smtpUser || !env.smtpPass) {
-    console.error('[submit-quote] missing server environment configuration');
-    return fail(res, 500, 'Service is not configured. Please try again later.');
-  }
-
   try {
     const supabase = createClient(env.supabaseUrl, env.supabaseKey, {
       auth: { persistSession: false, autoRefreshToken: false },
